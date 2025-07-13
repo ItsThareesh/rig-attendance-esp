@@ -10,9 +10,9 @@
 #include "lwip/err.h"
 #include "lwip/sys.h"
 
-#define ESP_WIFI_SSID CONFIG_ESP_WIFI_SSID
-#define ESP_WIFI_CHANNEL CONFIG_ESP_WIFI_CHANNEL
-#define MAX_STA_CONN CONFIG_ESP_MAX_STA_CONN
+#define ESP_WIFI_SSID "ESP32-WIFI"
+#define ESP_WIFI_CHANNEL 1
+#define MAX_STA_CONN 4
 
 static const char *TAG = "softAP";
 
@@ -21,12 +21,12 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
     if (event_id == WIFI_EVENT_AP_STACONNECTED)
     {
         wifi_event_ap_staconnected_t *event = (wifi_event_ap_staconnected_t *)event_data;
-        ESP_LOGI(TAG, "Station " MACSTR " connected", MAC2STR(event->mac));
+        ESP_LOGI(TAG, "Station " MACSTR " Connected", MAC2STR(event->mac));
     }
     else if (event_id == WIFI_EVENT_AP_STADISCONNECTED)
     {
         wifi_event_ap_stadisconnected_t *event = (wifi_event_ap_stadisconnected_t *)event_data;
-        ESP_LOGI(TAG, "Station " MACSTR " disconnected", MAC2STR(event->mac));
+        ESP_LOGI(TAG, "Station " MACSTR " Disconnected", MAC2STR(event->mac));
     }
 }
 
@@ -48,13 +48,11 @@ void wifi_init_softap(void)
     wifi_config_t wifi_config = {
         .ap = {
             .ssid = ESP_WIFI_SSID,
+            .password = "1234", // No password for open AP,
             .ssid_len = strlen(ESP_WIFI_SSID),
             .channel = ESP_WIFI_CHANNEL,
-            .max_connection = MAX_STA_CONN,
             .authmode = WIFI_AUTH_OPEN,
-            .pmf_cfg = {
-                .required = true,
-            },
+            .max_connection = MAX_STA_CONN,
         },
     };
 
@@ -63,19 +61,4 @@ void wifi_init_softap(void)
     ESP_ERROR_CHECK(esp_wifi_start());
 
     ESP_LOGI(TAG, "softAP Initialized. SSID:%s", ESP_WIFI_SSID);
-}
-
-void app_main(void)
-{
-    // Initialize NVS
-    esp_err_t ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
-    {
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        ret = nvs_flash_init();
-    }
-    ESP_ERROR_CHECK(ret);
-
-    ESP_LOGI(TAG, "ESP_WIFI ENABLED");
-    wifi_init_softap();
 }
