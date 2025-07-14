@@ -2,17 +2,120 @@
 <html>
 
 <head>
+    <title>Connect to Wi-Fi</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
+        * {
+            box-sizing: border-box;
+        }
+
         body {
-            background-color: #ffffff;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f2f5;
+            min-height: 100dvh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            max-width: 600px;
+            width: 100%;
+            padding: 40px 32px;
+            background: #fff;
+            border-radius: 10px;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+            margin: auto;
+        }
+
+        h1 {
+            font-size: 22px;
+            margin-bottom: 12px;
+            color: #222;
+            text-align: center;
+        }
+
+        p {
+            font-size: 15px;
+            margin-bottom: 18px;
+            color: #555;
+            text-align: center;
+        }
+
+        .link-container {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 20px;
+        }
+
+        .link-label {
+            font-size: 13.5px;
+            font-weight: 600;
+            color: #007aff;
+            text-align: left;
+        }
+
+        .link-input {
+            font-size: 14px;
+            padding: 9px 12px;
+            border: 1.5px solid #007aff;
+            border-radius: 6px;
+            width: 100%;
+            text-align: center;
+            color: #333;
+            background-color: #f9fbff;
+        }
+
+        .link-note {
+            font-size: 12px;
+            color: #777;
+            text-align: center;
+        }
+
+        .instructions {
+            font-size: 14px;
+            color: #333;
+            text-align: left;
+            background-color: #f8f9fa;
+            padding: 14px;
+            border-radius: 6px;
+            line-height: 1.5;
+        }
+
+        .instructions ol {
+            padding-left: 18px;
+            margin: 0;
+        }
+
+        .instructions li {
+            margin-bottom: 8px;
         }
     </style>
-    <title>ESP Captive Portal</title>
 </head>
 
 <body>
-    <h1>ESP Captive Portal</h1>
-    <p>Hello World, this is ESP32!</p>
+    <div class="container">
+        <h1>ESP Powered RIG-Attendance</h1>
+        <p>Tap the link below to select and copy it to your clipboard.</p>
+
+        <div class="link-container">
+            <label for="linkInput" class="link-label">Your Access Link</label>
+            <input id="linkInput" class="link-input" value="https://www.google.com" readonly onclick="this.select()">
+            <span class="link-note">Tap to select and copy manually</span>
+        </div>
+
+        <div class="instructions">
+            <strong>Final Steps:</strong>
+            <ol>
+                <li>Tap 'Done' at the top of this screen.</li>
+                <li>Go to Settings and disconnect from this Wi-Fi.</li>
+                <li>Open your browser and <b>paste</b> the link to continue.</li>
+            </ol>
+        </div>
+    </div>
 </body>
 
 </html>
