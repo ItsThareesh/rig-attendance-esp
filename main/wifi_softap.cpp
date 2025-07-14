@@ -1,14 +1,9 @@
 #include <string.h>
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
 #include "esp_mac.h"
 #include "esp_wifi.h"
 #include "esp_event.h"
+#include "lwip/inet.h"
 #include "esp_log.h"
-#include "nvs_flash.h"
-
-#include "lwip/err.h"
-#include "lwip/sys.h"
 
 #define ESP_WIFI_SSID "ESP32-WIFI"
 #define ESP_WIFI_CHANNEL 1
@@ -48,7 +43,7 @@ void wifi_init_softap(void)
     wifi_config_t wifi_config = {
         .ap = {
             .ssid = ESP_WIFI_SSID,
-            .password = "1234", // No password for open AP,
+            .password = "",
             .ssid_len = strlen(ESP_WIFI_SSID),
             .channel = ESP_WIFI_CHANNEL,
             .authmode = WIFI_AUTH_OPEN,
@@ -60,5 +55,12 @@ void wifi_init_softap(void)
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &wifi_config));
     ESP_ERROR_CHECK(esp_wifi_start());
 
-    ESP_LOGI(TAG, "softAP Initialized. SSID:%s", ESP_WIFI_SSID);
+    esp_netif_ip_info_t ip_info;
+    esp_netif_get_ip_info(esp_netif_get_handle_from_ifkey("WIFI_AP_DEF"), &ip_info);
+
+    char ip_addr[16];
+    inet_ntoa_r(ip_info.ip.addr, ip_addr, 16);
+    ESP_LOGI(TAG, "Set up softAP with IP: %s", ip_addr);
+
+    ESP_LOGI(TAG, "wifi_init_softap finished. SSID:'%s'", ESP_WIFI_SSID);
 }
