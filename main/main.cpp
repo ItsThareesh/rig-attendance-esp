@@ -6,6 +6,10 @@
 
 extern "C" void app_main(void)
 {
+    esp_log_level_set("httpd_uri", ESP_LOG_ERROR);
+    esp_log_level_set("httpd_txrx", ESP_LOG_ERROR);
+    esp_log_level_set("httpd_parse", ESP_LOG_ERROR);
+
     // Initialize NVS
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
@@ -17,7 +21,7 @@ extern "C" void app_main(void)
 
     wifi_init_softap();
 
-    start_http_server();
+    start_websever();
 
     dns_server_config_t config = DNS_SERVER_CONFIG_SINGLE("*", "WIFI_AP_DEF");
     start_dns_server(&config);
