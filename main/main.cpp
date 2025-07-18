@@ -4,6 +4,7 @@
 #include "redirector.h"
 #include "dns_server.h"
 #include "hmac_token_generator.h"
+#include "time_sync.h"
 
 extern "C" void app_main(void)
 {
@@ -26,7 +27,13 @@ extern "C" void app_main(void)
     
     // Pass HMAC generator to redirector
     set_hmac_generator(hmac_generator);
+
+    // Initialize WiFi in SoftAP mode
     wifi_init_softap();
+    
+    // Initialize and start time synchronization
+    time_sync_init();
+    time_sync_start();
 
     start_websever();
 
