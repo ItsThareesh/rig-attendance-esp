@@ -3,6 +3,7 @@
 #include "wifi_softap.h"
 #include "redirector.h"
 #include "dns_server.h"
+#include "hmac_token_generator.h"
 
 extern "C" void app_main(void)
 {
@@ -19,6 +20,12 @@ extern "C" void app_main(void)
     }
     ESP_ERROR_CHECK(ret);
 
+    // Initialize HMAC token generator with a secret key
+    HMACTokenGenerator* hmac_generator = new HMACTokenGenerator("your_secret_attendance_key_2024", 
+                                                                HMACTokenGenerator::getPlatformHMACFunction());
+    
+    // Pass HMAC generator to redirector
+    set_hmac_generator(hmac_generator);
     wifi_init_softap();
 
     start_websever();
