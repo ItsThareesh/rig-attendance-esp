@@ -13,32 +13,6 @@ static HMACTokenGenerator *global_hmac_generator = nullptr;
 extern const char root_start[] asm("_binary_root_html_start");
 extern const char root_end[] asm("_binary_root_html_end");
 
-// Function to read HTML file from filesystem
-// static char *read_html_file(const char *filename)
-// {
-//     FILE *file = fopen(filename, "r");
-
-//     // Get file size
-//     fseek(file, 0, SEEK_END);
-//     long file_size = ftell(file);
-//     fseek(file, 0, SEEK_SET);
-
-//     // Allocate memory for content
-//     char *content = (char *)malloc(file_size + 1);
-//     if (content == NULL)
-//     {
-//         ESP_LOGE(TAG, "Failed to allocate memory for file content");
-//         fclose(file);
-//         return NULL;
-//     }
-
-//     // Read file content
-//     fread(content, 1, file_size, file);
-//     content[file_size] = '\0';
-
-//     fclose(file);
-//     return content;
-// }
 
 // Handler to serve the Main Captive Portal Page
 static esp_err_t root_get_handler(httpd_req_t *req)
@@ -66,7 +40,7 @@ static esp_err_t root_get_handler(httpd_req_t *req)
 
         // Create the dynamic link
         snprintf(dynamic_link, sizeof(dynamic_link),
-                 "https://example.com/checkin?token=%s",
+                 "https://rig-attendance-backend--rig-attendance-app.us-central1.hosted.app?token=%s",
                  token.c_str());
 
         ESP_LOGI(TAG, "Generated link : %s", dynamic_link);

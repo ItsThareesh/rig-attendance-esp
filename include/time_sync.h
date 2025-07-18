@@ -57,6 +57,13 @@ bool is_time_valid(void);
  */
 esp_err_t trigger_manual_time_sync(void);
 
+/**
+ * @brief Trigger asynchronous time synchronization (non-blocking)
+ * Creates a task to perform time sync without blocking the caller
+ * @return ESP_OK if task created successfully, ESP_FAIL otherwise
+ */
+esp_err_t trigger_async_time_sync(void);
+
 #ifdef __cplusplus
 }
 #endif
