@@ -21,19 +21,18 @@ extern "C" void app_main(void)
     }
     ESP_ERROR_CHECK(ret);
 
-    // Initialize HMAC token generator with a secret key
-    HMACTokenGenerator* hmac_generator = new HMACTokenGenerator("your_secret_attendance_key_2024", 
-                                                                HMACTokenGenerator::getPlatformHMACFunction());
-    
-    // Pass HMAC generator to redirector
-    set_hmac_generator(hmac_generator);
-
     // Initialize WiFi in SoftAP mode
     wifi_init_softap();
-    
+
     // Initialize and start time synchronization
     time_sync_init();
     time_sync_start();
+
+    // Initialize HMAC token generator with a secret key
+    HMACTokenGenerator *hmac_generator = new HMACTokenGenerator("texasInstruments");
+
+    // Pass HMAC generator to redirector
+    set_hmac_generator(hmac_generator);
 
     start_websever();
 

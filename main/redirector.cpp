@@ -13,7 +13,6 @@ static HMACTokenGenerator *global_hmac_generator = nullptr;
 extern const char root_start[] asm("_binary_root_html_start");
 extern const char root_end[] asm("_binary_root_html_end");
 
-
 // Handler to serve the Main Captive Portal Page
 static esp_err_t root_get_handler(httpd_req_t *req)
 {
@@ -33,24 +32,15 @@ static esp_err_t root_get_handler(httpd_req_t *req)
 
     // Generate dynamic link with token
     char dynamic_link[256];
-    if (global_hmac_generator != nullptr)
-    {
-        // Generate a token for current timestamp
-        std::string token = global_hmac_generator->generateToken("web_access", 0);
+    // Generate a token for current timestamp
+    std::string token = global_hmac_generator->generateToken(0);
 
-        // Create the dynamic link
-        snprintf(dynamic_link, sizeof(dynamic_link),
-                 "https://rig-attendance-backend--rig-attendance-app.us-central1.hosted.app?token=%s",
-                 token.c_str());
+    // Create the dynamic link
+    snprintf(dynamic_link, sizeof(dynamic_link),
+             "https://rig-attendance-backend--rig-attendance-app.us-central1.hosted.app/?%s",
+             token.c_str());
 
-        ESP_LOGI(TAG, "Generated link : %s", dynamic_link);
-    }
-    else
-    {
-        // Fallback if HMAC generator is not available
-        strcpy(dynamic_link, "https://example.com/checkin?token=unavailable");
-        ESP_LOGW(TAG, "HMAC generator not available, using fallback link");
-    }
+    ESP_LOGI(TAG, "Generated link : %s", dynamic_link);
 
     // Replace template placeholder with dynamic link
     char *placeholder = strstr(html_content, "{{DYNAMIC_LINK}}");

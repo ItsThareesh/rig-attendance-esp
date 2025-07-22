@@ -3,8 +3,8 @@
 
 // WiFi credentials for time synchronization
 // Replace these with your actual WiFi network credentials
-#define WIFI_SSID_FOR_SYNC "Riggu"
-#define WIFI_PASS_FOR_SYNC "getconnected"
+#define WIFI_SSID_FOR_SYNC "Thareesh’s iPhone 14 Pro"
+#define WIFI_PASS_FOR_SYNC "getConnected"
 
 // Time sync settings
 #define TIME_SYNC_INTERVAL_MINUTES 10
