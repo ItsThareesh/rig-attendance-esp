@@ -1,10 +1,18 @@
 # RIG Attendance System - WiFi and Time Synchronization
 
-This ESP32-based attendance system features an intelligent WiFi AP+STA mode implementation with automatic time synchronization capabilities, providing both captive portal functionality and seamless internet connectivity for accurate timestamping.
+A comprehensive ESP32-based attendance system featuring dual WiFi operation, automatic time synchronization, and secure HMAC-based token generation for seamless attendance management.
 
 ## Overview
 
 The system has been designed to operate in dual WiFi mode (AP+STA), eliminating the need for mode switching and ensuring continuous availability of both the captive portal and internet connectivity for time synchronization.
+
+## Architecture
+The system consists of several key components:
+- Dual WiFi Mode (AP+STA): Simultaneous Access Point and Station operation
+- Captive Portal: Web interface for user interaction
+- HMAC Token Generator: Secure timestamp-based token creation using mbedTLS
+- Time Synchronization: Automatic NTP-based time management
+- DNS Server: Captive portal redirection handling
 
 ## Key Features
 
@@ -62,6 +70,33 @@ The system has been designed to operate in dual WiFi mode (AP+STA), eliminating 
 - `WIFI_CONNECT_TIMEOUT_SECONDS`: WiFi connection timeout (default: 30 seconds)
 - `TIME_SYNC_TIMEOUT_SECONDS`: SNTP sync timeout (default: 30 seconds)
 
+## Project Structure
+
+```
+.
+├── CMakeLists.txt
+├── README.md
+├── components
+│   └── dns_server
+├── include
+│   ├── hmac_token_generator.h
+│   ├── redirector.h
+│   ├── time_sync.h
+│   ├── wifi_config.h
+│   └── wifi_softap.h
+├── main
+│   ├── CMakeLists.txt
+│   ├── hmac_token_generator.cpp
+│   ├── main.cpp
+│   ├── redirector.cpp
+│   ├── root.html
+│   ├── time_sync.cpp
+│   ├── token-generator.cpp
+│   └── wifi_softap.cpp
+└── sdkconfig
+```
+
+
 ## How It Works
 
 ### Startup Sequence
@@ -92,9 +127,13 @@ The system has been designed to operate in dual WiFi mode (AP+STA), eliminating 
 - Manual time sync (blocking): `trigger_manual_time_sync()`
 - Asynchronous time sync (non-blocking): `trigger_async_time_sync()`
 
-## Benefits
+### Token Format
+Generated tokens follow this format:
+```
+ts=1643723400&am=0&hmac=a1b2c3d4e5f6789..
+```
 
-### Advantages of Current Implementation
+## Benefits
 1. **No Mode Switching**: Eliminates disruption to AP functionality during time sync
 2. **Continuous Availability**: Captive portal always accessible
 3. **Automatic Connection**: No manual intervention needed for WiFi connection
@@ -111,15 +150,17 @@ The system has been designed to operate in dual WiFi mode (AP+STA), eliminating 
 ## Setup Instructions
 
 1. **Configure WiFi Credentials**: Edit `include/wifi_config.h` with your WiFi network details
-2. **Build and Flash**: Compile and upload the firmware to your ESP32
-3. **Automatic Operation**: The device will automatically:
+2. **Change the following settings on ESP Menu-Config**
+   - Enable **C++ Exceptions**
+   - Change **Max HTTP Request Header Length** to `1024`
+   - Change **Partition Table** to `Single factory app (large), no OTA`
+3. **Build and Flash**: Compile and upload the firmware to your ESP32
+4. **Automatic Operation**: The device will automatically:
    - Start the captive portal (ESP32-WIFI)
    - Scan for and connect to your configured WiFi network
    - Begin time synchronization once connected
 
 ## Monitoring and Debugging
-
-### Serial Output Messages
 Check the serial output for status messages:
 - "Starting periodic time synchronization..."
 - "Connected to WiFi for time sync"
@@ -128,11 +169,11 @@ Check the serial output for status messages:
 - WiFi connection status updates
 - Auto-reconnection attempts
 
-### Usage Notes
+## Usage Notes
 - The ESP32 will appear as "ESP32-WIFI" access point immediately after startup
 - When the configured WiFi network becomes available, the device will auto-connect
 - Time sync will begin automatically once connected to the internet
-- Captive portal functionality remains uninterrupted throughout operation
+- Captive portal functionality remains uninterrupted throughout operation (it's advised to sync with UNIX time to work with backend)
 - Monitor serial logs to track WiFi connection and time sync status
 
 ## Troubleshooting

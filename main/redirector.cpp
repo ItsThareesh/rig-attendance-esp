@@ -8,7 +8,6 @@
 #include <stdlib.h>
 
 static const char *TAG = "CaptivePortal";
-static HMACTokenGenerator *global_hmac_generator = nullptr;
 
 extern const char root_start[] asm("_binary_root_html_start");
 extern const char root_end[] asm("_binary_root_html_end");
