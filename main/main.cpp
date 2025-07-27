@@ -29,12 +29,9 @@ extern "C" void app_main(void)
     time_sync_start();
 
     // Initialize HMAC token generator with a secret key
-    HMACTokenGenerator *hmac_generator = new HMACTokenGenerator("texasInstruments");
+    HMACTokenGenerator *hmac_generator = new HMACTokenGenerator("your-very-secret-key");
 
-    // Pass HMAC generator to redirector
-    set_hmac_generator(hmac_generator);
-
-    start_websever();
+    start_webserver(hmac_generator);
 
     dns_server_config_t config = DNS_SERVER_CONFIG_SINGLE("*", "WIFI_AP_DEF");
     start_dns_server(&config);
