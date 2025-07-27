@@ -3,6 +3,8 @@
 #include "wifi_softap.h"
 #include "redirector.h"
 #include "dns_server.h"
+#include "hmac_token_generator.h"
+#include "time_sync.h"
 
 extern "C" void app_main(void)
 {
@@ -19,9 +21,17 @@ extern "C" void app_main(void)
     }
     ESP_ERROR_CHECK(ret);
 
+    // Initialize WiFi in SoftAP mode
     wifi_init_softap();
 
-    start_websever();
+    // Initialize and start time synchronization
+    time_sync_init();
+    time_sync_start();
+
+    // Initialize HMAC token generator with a secret key
+    HMACTokenGenerator *hmac_generator = new HMACTokenGenerator("your-very-secret-key");
+
+    start_webserver(hmac_generator);
 
     dns_server_config_t config = DNS_SERVER_CONFIG_SINGLE("*", "WIFI_AP_DEF");
     start_dns_server(&config);
