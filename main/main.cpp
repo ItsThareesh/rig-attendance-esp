@@ -5,6 +5,7 @@
 #include "dns_server.h"
 #include "hmac_token_generator.h"
 #include "time_sync.h"
+#include "nfc.h"
 
 extern "C" void app_main(void)
 {
@@ -35,4 +36,7 @@ extern "C" void app_main(void)
 
     dns_server_config_t config = DNS_SERVER_CONFIG_SINGLE("*", "WIFI_AP_DEF");
     start_dns_server(&config);
+
+    // Start NFC task for periodic updates and tap detection
+    start_nfc_task();
 }

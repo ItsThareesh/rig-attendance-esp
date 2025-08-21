@@ -1,0 +1,19 @@
+dependencies:
+  idf:
+    version: '>=5.0'
+description: NDEF (NFC Data Exchange Format) component for ESP-IDF
+documentation: https://esp-cpp.github.io/espp/nfc/ndef.html
+license: MIT
+maintainers:
+- William Emfinger <waemfinger@gmail.com>
+repository: git://github.com/esp-cpp/espp.git
+repository_info:
+  commit_sha: 2aec149e3168d388fa0b9b1b811853be333d8acd
+  path: components/ndef
+tags:
+- cpp
+- Component
+- NFC
+- NDEF
+url: https://github.com/esp-cpp/espp/tree/main/components/ndef
+version: 1.0.21
