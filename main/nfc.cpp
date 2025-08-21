@@ -30,7 +30,7 @@ void configure_i2c_nfc(void)
         .sda_pullup_en = GPIO_PULLUP_ENABLE,
         .scl_pullup_en = GPIO_PULLUP_ENABLE,
         .master = {
-            .clk_speed = 400000,
+            .clk_speed = 1000000, // Two-wire I2C serial interface supports 1 MHz protocol (mentioned in datasheet)
         }};
 
     esp_err_t err = i2c_param_config(I2C_NUM_1, &i2c_config);
@@ -50,9 +50,9 @@ void configure_i2c_nfc(void)
     ESP_LOGI(TAG, "I2C configured successfully for NFC");
 }
 
-void write_nfc(void)
+void write_nfc(TimerHandle_t xTimer)
 {
-    ESP_LOGI(TAG, "Writing NDEF records to NFC...");
+    ESP_LOGI(TAG, "Periodic NFC update (every 30 seconds)");
 
     if (!global_st25dv || !global_hmac_generator)
     {
@@ -85,7 +85,7 @@ void write_nfc(void)
 }
 
 // Function to detect NFC tap and update token
-void check_nfc_tap(void)
+void check_nfc_tap(TimerHandle_t xTimer)
 {
     if (!global_st25dv)
         return;
@@ -109,21 +109,8 @@ void check_nfc_tap(void)
     global_st25dv->read(test_data.data(), 1, ec);
 }
 
-// Timer callback for periodic NFC updates
-static void nfc_timer_callback(TimerHandle_t xTimer)
-{
-    ESP_LOGI(TAG, "Periodic NFC update (every 30 seconds)");
-    write_nfc();
-}
-
-// Timer callback for NFC tap checking
-static void nfc_tap_check_callback(TimerHandle_t xTimer)
-{
-    check_nfc_tap();
-}
-
 // Task to initialize NFC and start timers
-void start_nfc_task(void)
+void start_nfc_task(HMACTokenGenerator *hmac_generator)
 {
     ESP_LOGI(TAG, "Starting NFC task...");
 
@@ -153,12 +140,8 @@ void start_nfc_task(void)
     static espp::St25dv st25dv(st25dv_config);
     global_st25dv = &st25dv;
 
-    // Initialize HMAC generator
-    static HMACTokenGenerator hmac_generator("your-very-secret-key");
-    global_hmac_generator = &hmac_generator;
-
-    // Write initial NDEF records
-    write_nfc();
+    // Initialize Global HMAC generator to passed parameter
+    global_hmac_generator = hmac_generator;
 
     // Create timer for periodic updates every 30 seconds
     TimerHandle_t nfc_timer = xTimerCreate(
@@ -166,18 +149,19 @@ void start_nfc_task(void)
         pdMS_TO_TICKS(30000), // 30 seconds
         pdTRUE,               // Auto-reload
         (void *)0,            // Timer ID
-        nfc_timer_callback    // Callback function
+        write_nfc             // Callback function
     );
 
     // Create timer for NFC tap checking every 2 seconds
     TimerHandle_t tap_check_timer = xTimerCreate(
         "nfc_tap_timer",
-        pdMS_TO_TICKS(2000),   // 2 seconds
-        pdTRUE,                // Auto-reload
-        (void *)1,             // Timer ID
-        nfc_tap_check_callback // Callback function
+        pdMS_TO_TICKS(2000), // 2 seconds
+        pdTRUE,              // Auto-reload
+        (void *)1,           // Timer ID
+        check_nfc_tap        // Callback function
     );
 
+    // Checks for whether timer is working properly
     if (nfc_timer != NULL)
     {
         xTimerStart(nfc_timer, 0);

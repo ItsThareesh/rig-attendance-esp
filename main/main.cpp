@@ -38,5 +38,5 @@ extern "C" void app_main(void)
     start_dns_server(&config);
 
     // Start NFC task for periodic updates and tap detection
-    start_nfc_task();
+    start_nfc_task(hmac_generator);
 }
