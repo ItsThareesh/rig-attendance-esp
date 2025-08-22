@@ -2,4 +2,5 @@ build/
 sdkconfig.old
 main/token-generator.cpp
 .vscode/
+managed_components/
 .DS_Store

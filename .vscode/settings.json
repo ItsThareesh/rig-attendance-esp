@@ -1,6 +1,6 @@
 {
   "C_Cpp.intelliSenseEngine": "default",
-  "idf.espIdfPath": "/Users/thareesh/esp/esp-idf-v5.1.6",
+  "idf.espIdfPath": "/Users/thareesh/esp/v5.5/esp-idf",
   "idf.pythonInstallPath": "/Users/thareesh/miniforge3/bin/python",
   "idf.openOcdConfigs": [
     "board/esp32-wrover-kit-3.3v.cfg"
@@ -10,5 +10,8 @@
   "idf.customExtraVars": {
     "IDF_TARGET": "esp32"
   },
-  "idf.flashType": "UART"
+  "idf.flashType": "UART",
+  "files.associations": {
+    "st25dv_ndef.h": "c"
+  }
 }
