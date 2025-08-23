@@ -71,7 +71,7 @@ The system consists of several key components:
 
 ## Configuration
 
-### NFC Settings (`main/nfc.cpp`)
+<!-- ### NFC Settings (`main/nfc.cpp`)
 ```c
 // I2C Configuration for ST25DV
 #define NFC_SDA_GPIO 21                    // I2C SDA pin
@@ -79,7 +79,7 @@ The system consists of several key components:
 #define NFC_I2C_FREQ_HZ 1000000           // 1 MHz clock speed
 #define NFC_UPDATE_INTERVAL_MS 30000      // Token update every 30 seconds
 #define NFC_TAP_CHECK_INTERVAL_MS 2000    // Tap detection every 2 seconds
-```
+``` -->
 
 ### WiFi Settings (`include/wifi_config.h`)
 ```c
@@ -113,7 +113,7 @@ The system consists of several key components:
 │   └── dns_server
 ├── include
 │   ├── hmac_token_generator.h
-│   ├── nfc.h                      # NFC function declarations
+│   ├── nfc.h
 │   ├── redirector.h
 │   ├── time_sync.h
 │   ├── wifi_config.h
@@ -121,9 +121,9 @@ The system consists of several key components:
 ├── main
 │   ├── CMakeLists.txt
 │   ├── hmac_token_generator.cpp
-│   ├── idf_component.yml          # ESP component dependencies
+│   ├── idf_component.yml
 │   ├── main.cpp
-│   ├── nfc.cpp                    # NFC ST25DV implementation
+│   ├── nfc.cpp
 │   ├── redirector.cpp
 │   ├── root.html
 │   ├── time_sync.cpp
@@ -248,9 +248,8 @@ Check the serial output for status messages:
 - Time sync will begin automatically once connected to the internet
 - Both captive portal and NFC functionality remain available throughout operation
 - NFC tokens are automatically refreshed every 30 seconds for enhanced security
-- Attendance can be logged via either web interface or NFC tap
 - Monitor serial logs to track WiFi connection, time sync, and NFC status
-- (It's advised to sync with UNIX time to work with backend)
+- It's advised to sync with UNIX time to work with backend
 
 ## Troubleshooting
 
