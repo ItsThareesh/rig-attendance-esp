@@ -19,14 +19,14 @@ The system consists of several key components:
 
 ### 1. Dual Mode WiFi Operation (AP+STA)
 - **Access Point (AP)**: Always active for captive portal functionality
-  - SSID: `ESP32-WIFI` (configurable in `wifi_softap.cpp`)
+  - SSID: `RIG-Attendance` (configurable in `wifi_ap_sta.h`)
   - Open authentication (no password)
   - IP: 192.168.4.1 (default)
-  - Max connections: 4
+  - Max connections: 4 (default)
 
 - **Station (STA)**: Continuously scans for and connects to target WiFi network
-  - Target network: Configured in `wifi_config.h` (WIFI_SSID_FOR_SYNC)
-  - Password: Configured in `wifi_config.h` (WIFI_PASS_FOR_SYNC)
+  - Target network: Configured in `wifi_ap_sta.h` (WIFI_SSID_FOR_SYNC)
+  - Password: Configured in `wifi_ap_sta.h` (WIFI_PASS_FOR_SYNC)
   - Auto-reconnection on disconnect
 
 ### 2. Automatic WiFi Network Discovery
@@ -37,7 +37,7 @@ The system consists of several key components:
 
 ### 3. NFC Communication with ST25DV Sensor
 - **Hardware**: ST25DV dynamic NFC/RFID tag with I2C interface
-  - I2C Configuration: SDA on GPIO 21, SCL on GPIO 22
+  - I2C Configuration: SDA on GPIO 21, SCL on GPIO 22 (Configurable in `nfc.h`)
   - Clock Speed: 1 MHz (as per ST25DV datasheet specification)
   - Dual interface: NFC wireless + I2C wired communication
 
@@ -69,42 +69,7 @@ The system consists of several key components:
   - time.nist.gov  
   - time.google.com
 
-## Configuration
-
-<!-- ### NFC Settings (`main/nfc.cpp`)
-```c
-// I2C Configuration for ST25DV
-#define NFC_SDA_GPIO 21                    // I2C SDA pin
-#define NFC_SCL_GPIO 22                    // I2C SCL pin  
-#define NFC_I2C_FREQ_HZ 1000000           // 1 MHz clock speed
-#define NFC_UPDATE_INTERVAL_MS 30000      // Token update every 30 seconds
-#define NFC_TAP_CHECK_INTERVAL_MS 2000    // Tap detection every 2 seconds
-``` -->
-
-### WiFi Settings (`include/wifi_config.h`)
-```c
-// Replace these with your actual WiFi network credentials
-#define WIFI_SSID_FOR_SYNC "Your_WiFi_Network_Name"    // Target WiFi network
-#define WIFI_PASS_FOR_SYNC "Your_WiFi_Password"        // WiFi password
-#define TIME_SYNC_INTERVAL_MINUTES 10                  // Time sync interval
-#define WIFI_CONNECT_TIMEOUT_SECONDS 30                // Connection timeout
-#define TIME_SYNC_TIMEOUT_SECONDS 30                   // SNTP sync timeout
-```
-
-### Access Point Settings (`main/wifi_softap.cpp`)
-```c
-#define ESP_WIFI_SSID "ESP32-WIFI"              // AP SSID
-#define ESP_WIFI_CHANNEL 1                      // AP WiFi channel
-#define MAX_STA_CONN 4                          // Max AP connections
-```
-
-### Time Sync Configuration Options
-- `TIME_SYNC_INTERVAL_MINUTES`: How often to sync time (default: 10 minutes)
-- `WIFI_CONNECT_TIMEOUT_SECONDS`: WiFi connection timeout (default: 30 seconds)
-- `TIME_SYNC_TIMEOUT_SECONDS`: SNTP sync timeout (default: 30 seconds)
-
 ## Project Structure
-
 ```
 .
 ├── CMakeLists.txt
@@ -116,8 +81,7 @@ The system consists of several key components:
 │   ├── nfc.h
 │   ├── redirector.h
 │   ├── time_sync.h
-│   ├── wifi_config.h
-│   └── wifi_softap.h
+│   └── wifi_ap_sta.h
 ├── main
 │   ├── CMakeLists.txt
 │   ├── hmac_token_generator.cpp
@@ -127,9 +91,42 @@ The system consists of several key components:
 │   ├── redirector.cpp
 │   ├── root.html
 │   ├── time_sync.cpp
-│   ├── token-generator.cpp
-│   └── wifi_softap.cpp
+│   └── wifi_ap_sta.cpp
 └── sdkconfig
+```
+
+## Configuration
+
+### WiFi Settings (`include/wifi_ap_sta.h`)
+```c
+// Replace these with your actual WiFi network credentials
+#define WIFI_SSID_FOR_SYNC "Your_WiFi_Network_Name"    // Target WiFi network
+#define WIFI_PASS_FOR_SYNC "Your_WiFi_Password"        // WiFi password
+
+// SoftAP configuration
+#define WIFI_AP_SSID "ESP32-WIFI"                      // AP SSID
+#define WIFI_AP_CHANNEL 1                              // AP WiFi channel
+#define WIFI_AP_MAX_CONNECTIONS 4                      // Max AP connections
+
+// WiFi scan configuration
+#define WIFI_SCAN_INTERVAL_MS 30000                    // Scan every 30 seconds
+#define WIFI_CONNECT_RETRY_DELAY_MS 5000               // Retry connection every 5 seconds
+```
+
+### NFC Settings (`include/nfc.h`)
+```c
+// I2C Configuration for ST25DV
+#define NFC_SDA_GPIO 21                    // I2C SDA pin
+#define NFC_SCL_GPIO 22                    // I2C SCL pin
+#define NFC_UPDATE_INTERVAL_MS 30000       // Token update every 30 seconds
+#define NFC_TAP_CHECK_INTERVAL_MS 2000     // Tap detection every 2 seconds
+```
+
+### Time Sync Settings (`include/time_sync.h`)
+```c
+#define TIME_SYNC_INTERVAL_MINUTES 10     // Time sync interval
+#define WIFI_CONNECT_TIMEOUT_SECONDS 30   // Connection timeout
+#define TIME_SYNC_TIMEOUT_SECONDS 30      // SNTP sync timeout
 ```
 
 
@@ -173,13 +170,13 @@ The system consists of several key components:
 ### Token Format
 Generated tokens follow this format with access method differentiation:
 ```
-ts=1643723400&am=0&hmac=a1b2c3d4e5f6789..    // Web access (captive portal)
+ts=1643723400&am=0&hmac=a1b2c3d4e5f6789..    // Web access (Captive Portal)
 ts=1643723400&am=1&hmac=a1b2c3d4e5f6789..    // NFC access (ST25DV sensor)
 ```
 
 Where:
-- `ts`: Unix timestamp for token validation
-- `am`: Access method (0 = Web/Captive Portal, 1 = NFC)
+- `ts`: UNIX timestamp for token validation
+- `am`: Access method (0 = Captive Portal, 1 = NFC)
 - `hmac`: HMAC-SHA256 signature for security verification
 
 ## Benefits
@@ -212,7 +209,7 @@ Where:
    - Ensure proper I2C pull-up resistors (typically 4.7kΩ)
 
 ### Software Configuration
-1. **Configure WiFi Credentials**: Edit `include/wifi_config.h` with your WiFi network details
+1. **Configure WiFi Credentials**: Edit `include/wifi_ap_sta.h` with your WiFi network details
 2. **Change the following settings on ESP Menu-Config**
    - Enable **C++ Exceptions**
    - Change **Max HTTP Request Header Length** to `1024`
@@ -254,7 +251,7 @@ Check the serial output for status messages:
 ## Troubleshooting
 
 ### WiFi and Time Sync Issues
-- If time sync fails, check WiFi credentials in `wifi_config.h`
+- If time sync fails, check WiFi credentials in `wifi_ap_sta.h`
 - Verify that the target WiFi network is available and has internet access
 - Check serial output for connection status and error messages
 - Ensure NTP servers are accessible from your network

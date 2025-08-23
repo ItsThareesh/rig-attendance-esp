@@ -1,7 +1,6 @@
 #pragma once
 
 // WiFi credentials for time synchronization
-// Replace these with your actual WiFi network credentials
 #define WIFI_SSID_FOR_SYNC "Thareesh's iPhone 14 Pro"
 #define WIFI_PASS_FOR_SYNC "getConnected"
 

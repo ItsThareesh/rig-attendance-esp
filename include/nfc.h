@@ -5,6 +5,8 @@
 // NFC configuration
 #define NFC_SDA_GPIO 21
 #define NFC_SCL_GPIO 22
+#define NFC_UPDATE_INTERVAL_MS 30000
+#define NFC_TAP_CHECK_INTERVAL_MS 2000
 
 #ifdef __cplusplus
 extern "C"

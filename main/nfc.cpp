@@ -147,19 +147,19 @@ void start_nfc_task(HMACTokenGenerator *hmac_generator)
     // Create timer for periodic updates every 30 seconds
     TimerHandle_t nfc_timer = xTimerCreate(
         "nfc_update_timer",
-        pdMS_TO_TICKS(30000), // 30 seconds
-        pdTRUE,               // Auto-reload
-        (void *)0,            // Timer ID
-        write_nfc             // Callback function
+        pdMS_TO_TICKS(NFC_UPDATE_INTERVAL_MS), // 30 seconds
+        pdTRUE,                                // Auto-reload
+        (void *)0,                             // Timer ID
+        write_nfc                              // Callback function
     );
 
     // Create timer for NFC tap checking every 2 seconds
     TimerHandle_t tap_check_timer = xTimerCreate(
         "nfc_tap_timer",
-        pdMS_TO_TICKS(2000), // 2 seconds
-        pdTRUE,              // Auto-reload
-        (void *)1,           // Timer ID
-        check_nfc_tap        // Callback function
+        pdMS_TO_TICKS(NFC_TAP_CHECK_INTERVAL_MS), // 2 seconds
+        pdTRUE,                                   // Auto-reload
+        (void *)1,                                // Timer ID
+        check_nfc_tap                             // Callback function
     );
 
     // Checks for whether timer is working properly
