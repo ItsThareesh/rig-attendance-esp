@@ -1,5 +1,4 @@
-#ifndef HMAC_TOKEN_GENERATOR_H
-#define HMAC_TOKEN_GENERATOR_H
+#pragma once
 
 #include <string>
 #include <vector>
@@ -51,5 +50,3 @@ public:
      */
     std::string generateToken(const int accessMethod = 0);
 };
-
-#endif // HMAC_TOKEN_GENERATOR_H

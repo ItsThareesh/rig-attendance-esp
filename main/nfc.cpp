@@ -10,9 +10,10 @@
 #include "freertos/task.h"
 #include "freertos/timers.h"
 
+#include "hmac_token_generator.h"
+#include "nfc.h"
 #include "st25dv.hpp"
 #include "ndef.hpp"
-#include "hmac_token_generator.h"
 
 static const char *TAG = "NFC";
 static espp::St25dv *global_st25dv = nullptr;
@@ -25,8 +26,8 @@ void configure_i2c_nfc(void)
     // Configure I2C with ESP-IDF directly
     i2c_config_t i2c_config = {
         .mode = I2C_MODE_MASTER,
-        .sda_io_num = 21,
-        .scl_io_num = 22,
+        .sda_io_num = NFC_SDA_GPIO,
+        .scl_io_num = NFC_SCL_GPIO,
         .sda_pullup_en = GPIO_PULLUP_ENABLE,
         .scl_pullup_en = GPIO_PULLUP_ENABLE,
         .master = {

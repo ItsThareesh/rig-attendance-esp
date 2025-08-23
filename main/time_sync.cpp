@@ -1,6 +1,5 @@
 #include "time_sync.h"
-#include "wifi_config.h"
-#include "wifi_softap.h"
+#include "wifi_ap_sta.h"
 #include "esp_log.h"
 #include "esp_sntp.h"
 #include "esp_wifi.h"
@@ -12,7 +11,7 @@
 #include <sys/time.h>
 #include <string.h>
 
-static const char *TAG = "time_sync";
+static const char *TAG = "TimeSync";
 
 // Time sync interval (configurable)
 #define TIME_SYNC_INTERVAL_MS (TIME_SYNC_INTERVAL_MINUTES * 60 * 1000)
@@ -87,7 +86,7 @@ static void time_sync_task(void *pvParameters)
     // Check if a recent sync attempt was made (within last 60 seconds)
     TickType_t current_time = xTaskGetTickCount();
     TickType_t time_since_last_sync = current_time - last_sync_attempt;
-    
+
     if (time_since_last_sync < pdMS_TO_TICKS(60000))
     {
         ESP_LOGI(TAG, "Recent sync attempt detected, skipping initial delay");
@@ -225,10 +224,10 @@ esp_err_t trigger_manual_time_sync(void)
 static void async_time_sync_task(void *pvParameters)
 {
     ESP_LOGI(TAG, "Async time sync task started");
-    
+
     // Perform time sync
     esp_err_t result = trigger_manual_time_sync();
-    
+
     if (result == ESP_OK)
     {
         ESP_LOGI(TAG, "Async time sync completed successfully");
@@ -237,7 +236,7 @@ static void async_time_sync_task(void *pvParameters)
     {
         ESP_LOGW(TAG, "Async time sync failed");
     }
-    
+
     // Delete this task
     vTaskDelete(NULL);
 }
@@ -245,10 +244,10 @@ static void async_time_sync_task(void *pvParameters)
 esp_err_t trigger_async_time_sync(void)
 {
     ESP_LOGI(TAG, "Async time sync triggered");
-    
+
     // Create a task to perform time sync asynchronously
     BaseType_t result = xTaskCreate(async_time_sync_task, "async_time_sync", 3072, NULL, 4, NULL);
-    
+
     if (result == pdPASS)
     {
         ESP_LOGI(TAG, "Async time sync task created successfully");

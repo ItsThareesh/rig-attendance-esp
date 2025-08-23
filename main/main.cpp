@@ -1,6 +1,6 @@
 #include "esp_log.h"
 #include "nvs_flash.h"
-#include "wifi_softap.h"
+#include "wifi_ap_sta.h"
 #include "redirector.h"
 #include "dns_server.h"
 #include "hmac_token_generator.h"
@@ -32,8 +32,8 @@ extern "C" void app_main(void)
     // Initialize HMAC token generator with a secret key
     HMACTokenGenerator *hmac_generator = new HMACTokenGenerator("your-very-secret-key");
 
+    // Initialize Webserver and DNS Server
     start_webserver(hmac_generator);
-
     dns_server_config_t config = DNS_SERVER_CONFIG_SINGLE("*", "WIFI_AP_DEF");
     start_dns_server(&config);
 
