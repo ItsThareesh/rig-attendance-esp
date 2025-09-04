@@ -146,10 +146,7 @@ void time_sync_init(void)
     time_sync_event_group = xEventGroupCreate();
 
     ESP_LOGI(TAG, "Time sync initialization complete");
-}
 
-void time_sync_start(void)
-{
     if (time_sync_task_handle == NULL)
     {
         xTaskCreate(time_sync_task, "time_sync_task", 4096, NULL, 5, &time_sync_task_handle);
@@ -168,16 +165,14 @@ void get_current_time_string(char *buffer, size_t buffer_size)
     struct tm timeinfo;
 
     time(&now);
+
+    // Set timezone to IST (UTC+5:30) according to POSIX format
+    setenv("TZ", "IST-5:30", 1);
+    tzset();
+
     localtime_r(&now, &timeinfo);
 
     strftime(buffer, buffer_size, "%Y-%m-%d %H:%M:%S", &timeinfo);
-}
-
-time_t get_current_timestamp(void)
-{
-    time_t now;
-    time(&now);
-    return now;
 }
 
 bool is_time_valid(void)
@@ -185,9 +180,8 @@ bool is_time_valid(void)
     time_t now;
     time(&now);
 
-    // Check if time is after 2020 (reasonable assumption)
-    // Timestamp for 2020-01-01 00:00:00 UTC is 1577836800
-    return now > 1577836800;
+    // Timestamp for Wednesday, January 1, 2025 12:00:00 AM UTC
+    return now > 1735689600;
 }
 
 esp_err_t trigger_manual_time_sync(void)

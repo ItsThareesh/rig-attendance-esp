@@ -27,7 +27,6 @@ extern "C" void app_main(void)
 
     // Initialize and start time synchronization
     time_sync_init();
-    time_sync_start();
 
     // Initialize HMAC token generator with a secret key
     HMACTokenGenerator *hmac_generator = new HMACTokenGenerator("your-very-secret-key");

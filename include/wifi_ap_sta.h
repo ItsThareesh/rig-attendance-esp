@@ -1,7 +1,7 @@
 #pragma once
 
 // WiFi credentials for time synchronization
-#define WIFI_SSID_FOR_SYNC "Thareesh's iPhone 14 Pro"
+#define WIFI_SSID_FOR_SYNC "Thareesh’s iPhone 14 Pro"
 #define WIFI_PASS_FOR_SYNC "getConnected"
 
 // SoftAP configuration

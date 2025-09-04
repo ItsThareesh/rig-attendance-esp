@@ -12,6 +12,7 @@
 
 #include "hmac_token_generator.h"
 #include "nfc.h"
+#include "time_sync.h"
 #include "st25dv.hpp"
 #include "ndef.hpp"
 
@@ -53,6 +54,13 @@ void configure_i2c_nfc(void)
 
 void write_nfc(TimerHandle_t xTimer)
 {
+    // Ensure system time has been synchronized at least once
+    if (!is_time_valid())
+    {
+        ESP_LOGW(TAG, "System time not synchronized yet — skipping NFC write");
+        return;
+    }
+
     ESP_LOGI(TAG, "Periodic NFC update (every 30 seconds)");
 
     if (!global_st25dv || !global_hmac_generator)
@@ -62,17 +70,20 @@ void write_nfc(TimerHandle_t xTimer)
     }
 
     std::error_code ec;
+    static char url_buffer[512];
 
     // Generate fresh token for attendance
     std::string token = global_hmac_generator->generateToken(1); // accessMethod = 1 for NFC
 
     // Create URL with token
-    std::string url = "webapp--rig-attendance-app.asia-east1.hosted.app/scan?" + token;
+    snprintf(url_buffer, sizeof(url_buffer),
+             "webapp--rig-attendance-app.asia-east1.hosted.app/scan?%s",
+             token.c_str());
 
     // Create NDEF records
     std::vector<espp::Ndef> records;
     records.emplace_back(espp::Ndef::make_text("RIG Attendance System"));
-    records.emplace_back(espp::Ndef::make_uri(url, espp::Ndef::Uic::HTTPS));
+    records.emplace_back(espp::Ndef::make_uri(url_buffer, espp::Ndef::Uic::HTTPS));
 
     // Write NDEF records
     global_st25dv->set_records(records, ec);

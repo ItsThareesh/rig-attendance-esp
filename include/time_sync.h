@@ -21,14 +21,9 @@ extern "C"
 #endif
 
     /**
-     * @brief Initialize time synchronization
+     * @brief Initialize and start time synchronization task
      */
     void time_sync_init(void);
-
-    /**
-     * @brief Start time synchronization task
-     */
-    void time_sync_start(void);
 
     /**
      * @brief Perform SNTP time synchronization
@@ -50,13 +45,7 @@ extern "C"
     void get_current_time_string(char *buffer, size_t buffer_size);
 
     /**
-     * @brief Get current timestamp (seconds since epoch)
-     * @return Current timestamp
-     */
-    time_t get_current_timestamp(void);
-
-    /**
-     * @brief Check if time is valid (not default 1970 time)
+     * @brief Check if time is valid (after 2025, not default 1970 time)
      * @return true if time appears valid, false otherwise
      */
     bool is_time_valid(void);
