@@ -30,7 +30,7 @@ void configure_i2c_nfc(void)
         .sda_pullup_en = GPIO_PULLUP_ENABLE,
         .scl_pullup_en = GPIO_PULLUP_ENABLE,
         .master = {
-            .clk_speed = 400000, // Two-wire I2C serial interface supports 1 MHz protocol (mentioned in datasheet)
+            .clk_speed = 100000, // Two-wire I2C serial interface supports 1 MHz protocol (mentioned in datasheet)
         }};
 
     esp_err_t err = i2c_param_config(I2C_NUM_1, &i2c_config);
@@ -75,13 +75,13 @@ void write_nfc_ftm(TimerHandle_t xTimer)
 {
     // Ensure system time has been synchronized at least once and
     // NFC and HMAC generator are initialized
-    if (!is_time_valid() || !global_st25dv || !global_hmac_generator)
+    if (!global_st25dv || !global_hmac_generator)
     {
         ESP_LOGW(TAG, "NFC write skipped - not ready");
         return;
     }
 
-    ESP_LOGI(TAG, "Periodic NFC update (every 3 seconds)");
+    ESP_LOGI(TAG, "Periodic NFC update (every 5 seconds)");
 
     std::error_code ec;
     static char url_buffer[512];
@@ -101,11 +101,40 @@ void write_nfc_ftm(TimerHandle_t xTimer)
     // Serialize NDEF records for writing into FTM mailbox
     std::vector<uint8_t> serialized_records = serialize_ndef_records(records);
 
+    // Start FTM mode
+    global_st25dv->start_fast_transfer_mode(ec);
+    if (ec)
+    {
+        ESP_LOGE(TAG, "start_fast_transfer_mode() failed: %s", ec.message().c_str());
+        return;
+    }
+
     // Write NDEF records to FTM mailbox
     global_st25dv->transfer(serialized_records.data(), serialized_records.size(), ec);
     if (ec)
     {
         ESP_LOGE(TAG, "Failed to write NDEF records: %s", ec.message().c_str());
+        return;
+    }
+
+    // uint8_t ftm_length = global_st25dv->get_ftm_length(ec);
+    // uint8_t data[ftm_length];
+
+    // global_st25dv->receive(data, ftm_length, ec);
+
+    // // READ the mailbox
+    // ESP_LOGI(TAG, "FTM Mailbox Length: %d", ftm_length);
+    // ESP_LOGI(TAG, "FTM Mailbox Data:");
+    // for (size_t i = 0; i < ftm_length; i++)
+    // {
+    //     printf("%02X ", data[i]);
+    // }
+    // printf("\n");
+
+    global_st25dv->stop_fast_transfer_mode(ec);
+    if (ec)
+    {
+        ESP_LOGE(TAG, "stop_fast_transfer_mode() failed: %s", ec.message().c_str());
         return;
     }
 
@@ -237,31 +266,6 @@ esp_err_t enable_mb_mode()
     return ESP_OK;
 }
 
-esp_err_t enable_ftm()
-{
-    // Enable MB_MODE in system configuration first
-    ESP_LOGI(TAG, "Enabling MB_MODE system register...");
-    if (enable_mb_mode() != ESP_OK)
-        return ESP_FAIL;
-
-    // Add small delay after MB_MODE
-    vTaskDelay(pdMS_TO_TICKS(1000));
-
-    // Start FTM with detailed logging
-    ESP_LOGI(TAG, "Starting start_fast_transfer_mode()");
-    std::error_code ec;
-
-    global_st25dv->start_fast_transfer_mode(ec);
-    if (ec)
-    {
-        ESP_LOGE(TAG, "start_fast_transfer_mode() failed: %s", ec.message().c_str());
-        return ESP_FAIL;
-    }
-
-    ESP_LOGI(TAG, "FTM started successfully!");
-    return ESP_OK;
-}
-
 // Task to initialize NFC and start timers
 void start_nfc_task(HMACTokenGenerator *hmac_generator)
 {
@@ -297,7 +301,7 @@ void start_nfc_task(HMACTokenGenerator *hmac_generator)
     espp::St25dv::Config st25dv_config;
     st25dv_config.write = write_fn;
     st25dv_config.read = read_fn;
-    st25dv_config.log_level = espp::Logger::Verbosity::DEBUG; // More verbose logging
+    st25dv_config.log_level = espp::Logger::Verbosity::INFO; // More verbose logging
 
     // Initialize St25dv
     static espp::St25dv st25dv(st25dv_config);
@@ -306,32 +310,33 @@ void start_nfc_task(HMACTokenGenerator *hmac_generator)
     // Initialize Global HMAC generator to passed parameter
     global_hmac_generator = hmac_generator;
 
-    // SKIP EEPROM WRITE - This is causing conflicts
-    ESP_LOGI(TAG, "Skipping EEPROM write, using FTM-only mode");
-
-    // Enable FTM mode directly
-    if (enable_ftm() != ESP_OK)
+    if (write_static_eeprom_record() != ESP_OK)
     {
-        ESP_LOGE(TAG, "Failed to enable FTM mode, aborting NFC initialization");
+        ESP_LOGE(TAG, "Static EEPROM write: Aborting NFC initialization");
         return;
     }
 
-    // Wait a bit after FTM initialization
     vTaskDelay(pdMS_TO_TICKS(500));
 
-    // Create timer for periodic updates every 10 seconds
+    if (enable_mb_mode() != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Failed to enable MB_Mode, aborting NFC initialization");
+        return;
+    }
+
+    // Create timer for periodic updates every 5 seconds
     TimerHandle_t nfc_timer = xTimerCreate(
         "write_nfc_timer",
-        pdMS_TO_TICKS(10000), // 10 seconds
-        pdTRUE,               // Auto-reload
-        (void *)0,            // Timer ID
-        write_nfc_ftm         // Callback function
+        pdMS_TO_TICKS(NFC_UPDATE_INTERVAL_MS), // 5 seconds
+        pdTRUE,                                // Auto-reload
+        (void *)0,                             // Timer ID
+        write_nfc_ftm                          // Callback function
     );
 
     if (nfc_timer != NULL)
     {
         xTimerStart(nfc_timer, 0);
-        ESP_LOGI(TAG, "NFC periodic update timer started (10s interval)");
+        ESP_LOGI(TAG, "NFC periodic update timer started (5s interval)");
     }
     else
         ESP_LOGE(TAG, "Failed to create NFC update timer");
