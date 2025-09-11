@@ -171,27 +171,30 @@ esp_err_t enable_mb_mode()
 {
     uint8_t default_password[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 
+    ESP_LOGI(TAG, "Presenting password for MB_MODE...");
     if (!present_password(default_password))
     {
         ESP_LOGE(TAG, "Cannot enable MB_MODE without presenting password");
         return ESP_FAIL;
     }
 
-    std::error_code ec;
+    // Add delay after password presentation
+    vTaskDelay(pdMS_TO_TICKS(500));
 
     // Write to MB_MODE register (0x000D) using SYST_ADDRESS
     uint8_t write_data[3] = {
-        0x00, // High byte of address 0x000D
-        0x0D, // Low byte of address 0x000D
-        0x01  // Enable MB_MODE (set to 1)
+        0x00,
+        0x0D,
+        0x01,
     };
 
+    ESP_LOGI(TAG, "Writing to MB_MODE register...");
     esp_err_t write_result = i2c_master_write_to_device(
         I2C_NUM_1,
         espp::St25dv::SYST_ADDRESS,
         write_data,
         sizeof(write_data),
-        pdMS_TO_TICKS(200));
+        pdMS_TO_TICKS(500)); // Increased timeout
 
     if (write_result != ESP_OK)
     {
@@ -199,11 +202,11 @@ esp_err_t enable_mb_mode()
         return write_result;
     }
 
-    uint8_t read_address[2] = {
-        0x00, // High byte of address 0x000D
-        0x0D  // Low byte of address 0x000D
-    };
+    // Add delay after write
+    vTaskDelay(pdMS_TO_TICKS(100));
 
+    // Read back to verify
+    uint8_t read_address[2] = {0x00, 0x0D};
     uint8_t read_data[1];
 
     esp_err_t read_result = i2c_master_write_read_device(
@@ -213,7 +216,7 @@ esp_err_t enable_mb_mode()
         sizeof(read_address),
         read_data,
         sizeof(read_data),
-        pdMS_TO_TICKS(200));
+        pdMS_TO_TICKS(500));
 
     if (read_result != ESP_OK)
     {
@@ -222,7 +225,15 @@ esp_err_t enable_mb_mode()
     }
 
     ESP_LOGI(TAG, "MB_MODE register value: 0x%02X", read_data[0]);
-    ESP_LOGI(TAG, "MB_MODE enabled successfully");
+
+    if (read_data[0] & 0x01)
+        ESP_LOGI(TAG, "MB_MODE enabled successfully");
+    else
+    {
+        ESP_LOGE(TAG, "MB_MODE not properly enabled (expected bit 0 set)");
+        return ESP_FAIL;
+    }
+
     return ESP_OK;
 }
 
@@ -262,21 +273,31 @@ void start_nfc_task(HMACTokenGenerator *hmac_generator)
     // Create write/read functions for espp::St25dv using native ESP-IDF
     auto write_fn = [](uint8_t device_address, const uint8_t *data, size_t length) -> bool
     {
-        esp_err_t ret = i2c_master_write_to_device(I2C_NUM_1, device_address, data, length, pdMS_TO_TICKS(100));
-        return ret == ESP_OK;
+        esp_err_t ret = i2c_master_write_to_device(I2C_NUM_1, device_address, data, length, pdMS_TO_TICKS(500));
+        if (ret != ESP_OK)
+        {
+            ESP_LOGW("NFC", "Write failed to 0x%02X: %s", device_address, esp_err_to_name(ret));
+            return false;
+        }
+        return true;
     };
 
     auto read_fn = [](uint8_t device_address, uint8_t *data, size_t length) -> bool
     {
-        esp_err_t ret = i2c_master_read_from_device(I2C_NUM_1, device_address, data, length, pdMS_TO_TICKS(100));
-        return ret == ESP_OK;
+        esp_err_t ret = i2c_master_read_from_device(I2C_NUM_1, device_address, data, length, pdMS_TO_TICKS(500));
+        if (ret != ESP_OK)
+        {
+            ESP_LOGW("NFC", "Read failed from 0x%02X: %s", device_address, esp_err_to_name(ret));
+            return false;
+        }
+        return true;
     };
 
     // Create St25dv configuration
     espp::St25dv::Config st25dv_config;
     st25dv_config.write = write_fn;
     st25dv_config.read = read_fn;
-    st25dv_config.log_level = espp::Logger::Verbosity::INFO;
+    st25dv_config.log_level = espp::Logger::Verbosity::DEBUG; // More verbose logging
 
     // Initialize St25dv
     static espp::St25dv st25dv(st25dv_config);
@@ -285,15 +306,18 @@ void start_nfc_task(HMACTokenGenerator *hmac_generator)
     // Initialize Global HMAC generator to passed parameter
     global_hmac_generator = hmac_generator;
 
-    // Write static record to EEPROM once on startup
-    if (write_static_eeprom_record() != ESP_OK)
-        return;
+    // SKIP EEPROM WRITE - This is causing conflicts
+    ESP_LOGI(TAG, "Skipping EEPROM write, using FTM-only mode");
 
-    vTaskDelay(pdMS_TO_TICKS(2000)); // Wait 2 seconds before enabling FTM
-
-    // Enable FTM mode
+    // Enable FTM mode directly
     if (enable_ftm() != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Failed to enable FTM mode, aborting NFC initialization");
         return;
+    }
+
+    // Wait a bit after FTM initialization
+    vTaskDelay(pdMS_TO_TICKS(500));
 
     // Create timer for periodic updates every 10 seconds
     TimerHandle_t nfc_timer = xTimerCreate(
