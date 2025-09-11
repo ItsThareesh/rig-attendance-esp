@@ -1,4 +1,5 @@
 #include "hmac_token_generator.h"
+#include "mbedtls/md.h"
 #include <stdexcept>
 #include <cstring>
 

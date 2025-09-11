@@ -1,7 +1,6 @@
 file(GLOB_RECURSE SOURCES "*.cpp" "*.c")
 idf_component_register(
     SRCS ${SOURCES}
-    PRIV_REQUIRES dns_server esp_http_server esp_wifi nvs_flash mbedtls esp_timer driver
+    PRIV_REQUIRES hmac_token_generator nfc wifi_connect time_sync dns_server esp_netif nvs_flash
     INCLUDE_DIRS "." "../include"
-    EMBED_FILES root.html
 )
