@@ -50,25 +50,22 @@ void configure_i2c_nfc(void)
     ESP_LOGI(TAG, "I2C configured successfully for NFC");
 }
 
-std::vector<uint8_t> serialize_ndef_records(std::vector<espp::Ndef> &records)
+std::vector<uint8_t> get_serialized_tlv(espp::Ndef &record)
 {
-    std::vector<uint8_t> record_data;
-    size_t total_size = 0;
+    std::vector<uint8_t> ndef_message = record.serialize();
+    std::vector<uint8_t> tlv_message;
+    tlv_message.reserve(ndef_message.size() + 3); // 0x03 + len + msg + 0xFE
 
-    for (auto &record : records)
-        total_size += record.get_size();
+    tlv_message.push_back(0x03); // NDEF TLV Tag
+    tlv_message.push_back(ndef_message.size());
 
-    record_data.reserve(total_size);
+    // Append the actual NDEF message
+    tlv_message.insert(tlv_message.end(), ndef_message.begin(), ndef_message.end());
 
-    for (size_t i = 0; i < records.size(); i++)
-    {
-        bool message_begin = (i == 0);
-        bool message_end = (i == records.size() - 1);
-        auto serialized_record = records[i].serialize(message_begin, message_end);
-        record_data.insert(record_data.end(), serialized_record.begin(), serialized_record.end());
-    }
+    // Terminator TLV
+    tlv_message.push_back(0xFE);
 
-    return record_data;
+    return tlv_message;
 }
 
 void write_nfc_ftm(TimerHandle_t xTimer)
@@ -95,11 +92,7 @@ void write_nfc_ftm(TimerHandle_t xTimer)
              token.c_str());
 
     // Create NDEF records
-    std::vector<espp::Ndef> records;
-    records.emplace_back(espp::Ndef::make_uri(url_buffer, espp::Ndef::Uic::HTTPS));
-
-    // Serialize NDEF records for writing into FTM mailbox
-    std::vector<uint8_t> serialized_records = serialize_ndef_records(records);
+    espp::Ndef record = espp::Ndef::make_uri(url_buffer, espp::Ndef::Uic::HTTPS);
 
     // Start FTM mode
     global_st25dv->start_fast_transfer_mode(ec);
@@ -109,6 +102,11 @@ void write_nfc_ftm(TimerHandle_t xTimer)
         return;
     }
 
+    // Serialize NDEF records for writing into FTM mailbox
+    std::vector<uint8_t> serialized_records = get_serialized_tlv(record);
+
+    ESP_LOGI(TAG, "Serialized NDEF records size: %d", serialized_records.size());
+
     // Write NDEF records to FTM mailbox
     global_st25dv->transfer(serialized_records.data(), serialized_records.size(), ec);
     if (ec)
@@ -117,15 +115,13 @@ void write_nfc_ftm(TimerHandle_t xTimer)
         return;
     }
 
-    // uint8_t ftm_length = global_st25dv->get_ftm_length(ec);
-    // uint8_t data[ftm_length];
-
-    // global_st25dv->receive(data, ftm_length, ec);
+    // std::vector<uint8_t> data(serialized_records.size());
+    // global_st25dv->receive(data.data(), data.size(), ec);
 
     // // READ the mailbox
-    // ESP_LOGI(TAG, "FTM Mailbox Length: %d", ftm_length);
+    // ESP_LOGI(TAG, "FTM Mailbox Length: %d", data.size());
     // ESP_LOGI(TAG, "FTM Mailbox Data:");
-    // for (size_t i = 0; i < ftm_length; i++)
+    // for (size_t i = 0; i < data.size(); i++)
     // {
     //     printf("%02X ", data[i]);
     // }
@@ -149,11 +145,10 @@ esp_err_t write_static_eeprom_record()
     std::error_code ec;
 
     // Create static record
-    std::vector<espp::Ndef> records;
-    records.emplace_back(espp::Ndef::make_text("RIG Attendance System 2025"));
+    espp::Ndef record = espp::Ndef::make_text("RIG Attendance System 2025");
 
     // Write to EEPROM
-    global_st25dv->set_records(records, ec);
+    global_st25dv->set_record(record, ec);
     if (ec)
     {
         ESP_LOGE(TAG, "Failed to write static EEPROM record: %s", ec.message().c_str());
