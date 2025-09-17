@@ -1,23 +1,23 @@
 #include <string.h>
+
 #include "esp_mac.h"
 #include "esp_wifi.h"
 #include "esp_event.h"
 #include "lwip/inet.h"
 #include "esp_log.h"
-#include "wifi_ap_sta.h"
-#include "time_sync.h"
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
 
-// Event group bits
-#define WIFI_STA_CONNECTED_BIT BIT0
-#define WIFI_STA_DISCONNECTED_BIT BIT1
+#include "wifi_ap_sta.h"
+#include "time_sync.h"
 
 static const char *TAG = "WIFI_AP_STA";
 static EventGroupHandle_t wifi_event_group;
 static TaskHandle_t wifi_scan_task_handle = NULL;
 static bool sta_connected = false;
+static bool scan_task_running = false;
 
 static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
@@ -42,102 +42,107 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
         wifi_event_sta_connected_t *event = (wifi_event_sta_connected_t *)event_data;
         ESP_LOGI(TAG, "STA: Connected to WiFi network: %s", event->ssid);
         sta_connected = true;
-        xEventGroupSetBits(wifi_event_group, WIFI_STA_CONNECTED_BIT);
+
+        // STOP scanning when connected
+        if (scan_task_running && wifi_scan_task_handle != NULL)
+        {
+            ESP_LOGI(TAG, "Stopping WiFi scan task - connected");
+            vTaskSuspend(wifi_scan_task_handle);
+            scan_task_running = false;
+        }
     }
     else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED)
     {
         wifi_event_sta_disconnected_t *event = (wifi_event_sta_disconnected_t *)event_data;
         ESP_LOGI(TAG, "STA: Disconnected from WiFi network (reason: %d)", event->reason);
         sta_connected = false;
-        xEventGroupSetBits(wifi_event_group, WIFI_STA_DISCONNECTED_BIT);
+
+        // RESTART scanning when disconnected
+        if (!scan_task_running && wifi_scan_task_handle != NULL)
+        {
+            ESP_LOGI(TAG, "Resuming WiFi scan task - disconnected");
+            vTaskResume(wifi_scan_task_handle);
+            scan_task_running = true;
+        }
     }
     else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP)
     {
         ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
         ESP_LOGI(TAG, "STA: Got IP address: " IPSTR, IP2STR(&event->ip_info.ip));
 
-        // Trigger immediate asynchronous time synchronization when connected
+        // Trigger immediate manual time synchronization when connected
         ESP_LOGI(TAG, "STA: Triggering immediate time synchronization...");
-        esp_err_t sync_result = trigger_async_time_sync();
-        if (sync_result == ESP_OK)
+        if (trigger_manual_time_sync() != ESP_OK)
         {
-            ESP_LOGI(TAG, "STA: Immediate time sync task created successfully");
-        }
-        else
-        {
-            ESP_LOGW(TAG, "STA: Failed to create immediate time sync task");
+            ESP_LOGW(TAG, "STA: Failed immediate time synchronization");
         }
     }
 }
 
-// Task to continuously scan for and connect to target WiFi network
+// Simplified scan task - only runs when needed
 static void wifi_scan_and_connect_task(void *pvParameters)
 {
-    ESP_LOGI(TAG, "WiFi scan and connect task started");
+    ESP_LOGI(TAG, "WiFi scan task started");
+    scan_task_running = true;
 
     while (1)
     {
-        if (!sta_connected)
+        // Only scan if not connected (task gets suspended when connected)
+        ESP_LOGI(TAG, "Scanning for WiFi network: %s", WIFI_SSID_FOR_SYNC);
+
+        // Start WiFi scan
+        wifi_scan_config_t scan_config = {
+            .ssid = (uint8_t *)WIFI_SSID_FOR_SYNC,
+            .bssid = NULL,
+            .channel = 0,
+            .show_hidden = false,
+            .scan_type = WIFI_SCAN_TYPE_ACTIVE,
+            .scan_time = {
+                .active = {
+                    .min = 100,
+                    .max = 300,
+                },
+            }};
+
+        esp_err_t scan_result = esp_wifi_scan_start(&scan_config, true);
+        if (scan_result == ESP_OK)
         {
-            ESP_LOGI(TAG, "Scanning for WiFi network: %s", WIFI_SSID_FOR_SYNC);
+            uint16_t ap_count = 0;
+            esp_wifi_scan_get_ap_num(&ap_count);
 
-            // Start WiFi scan
-            wifi_scan_config_t scan_config = {
-                .ssid = (uint8_t *)WIFI_SSID_FOR_SYNC,
-                .bssid = NULL,
-                .channel = 0,
-                .show_hidden = false,
-                .scan_type = WIFI_SCAN_TYPE_ACTIVE,
-                .scan_time = {
-                    .active = {
-                        .min = 100,
-                        .max = 300}}};
-
-            esp_err_t scan_result = esp_wifi_scan_start(&scan_config, true);
-            if (scan_result == ESP_OK)
+            if (ap_count > 0)
             {
-                uint16_t ap_count = 0;
-                esp_wifi_scan_get_ap_num(&ap_count);
+                ESP_LOGI(TAG, "Target WiFi network found! Attempting to connect...");
 
-                if (ap_count > 0)
-                {
-                    ESP_LOGI(TAG, "Target WiFi network found! Attempting to connect...");
+                // Configure WiFi STA settings
+                wifi_config_t wifi_config = {};
+                strcpy((char *)wifi_config.sta.ssid, WIFI_SSID_FOR_SYNC);
+                strcpy((char *)wifi_config.sta.password, WIFI_PASS_FOR_SYNC);
+                wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
+                wifi_config.sta.pmf_cfg.capable = true;
+                wifi_config.sta.pmf_cfg.required = false;
 
-                    // Configure WiFi STA settings
-                    wifi_config_t wifi_config = {};
-                    strcpy((char *)wifi_config.sta.ssid, WIFI_SSID_FOR_SYNC);
-                    strcpy((char *)wifi_config.sta.password, WIFI_PASS_FOR_SYNC);
-                    wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
-                    wifi_config.sta.pmf_cfg.capable = true;
-                    wifi_config.sta.pmf_cfg.required = false;
+                ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
 
-                    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
-
-                    // Try to connect
-                    esp_err_t connect_result = esp_wifi_connect();
-                    if (connect_result == ESP_OK)
-                        ESP_LOGI(TAG, "WiFi connection initiated");
-                    else
-                        ESP_LOGW(TAG, "Failed to initiate WiFi connection: %s", esp_err_to_name(connect_result));
-                }
+                // Try to connect
+                esp_err_t connect_result = esp_wifi_connect();
+                if (connect_result == ESP_OK)
+                    ESP_LOGI(TAG, "WiFi connection initiated");
                 else
-                    ESP_LOGD(TAG, "Target WiFi network not found in scan results");
+                    ESP_LOGW(TAG, "Failed to initiate WiFi connection: %s", esp_err_to_name(connect_result));
             }
             else
-                ESP_LOGW(TAG, "WiFi scan failed: %s", esp_err_to_name(scan_result));
+                ESP_LOGD(TAG, "Target WiFi network not found in scan results");
         }
         else
-            ESP_LOGD(TAG, "Already connected to WiFi, skipping scan");
+            ESP_LOGW(TAG, "WiFi scan failed: %s", esp_err_to_name(scan_result));
 
         // Wait before next scan attempt
-        vTaskDelay(pdMS_TO_TICKS(sta_connected ? WIFI_SCAN_INTERVAL_MS : WIFI_CONNECT_RETRY_DELAY_MS));
+        vTaskDelay(pdMS_TO_TICKS(WIFI_CONNECT_RETRY_DELAY_MS));
     }
 }
 
-bool is_wifi_sta_connected(void)
-{
-    return sta_connected;
-}
+bool is_wifi_sta_connected(void) { return sta_connected; }
 
 void wifi_init_softap(void)
 {
@@ -192,14 +197,12 @@ void wifi_init_softap(void)
 
     char ip_addr[16];
     inet_ntoa_r(ip_info.ip.addr, ip_addr, 16);
-    ESP_LOGI(TAG, "Set up softAP with IP: %s", ip_addr);
     ESP_LOGI(TAG, "WiFi initialized in AP+STA mode. AP SSID: '%s'", WIFI_AP_SSID);
     ESP_LOGI(TAG, "Will scan for STA network: '%s'", WIFI_SSID_FOR_SYNC);
 
-    // Start the WiFi scan and connect task
+    // Start the WiFi scan task (will be suspended when connected)
     if (wifi_scan_task_handle == NULL)
     {
         xTaskCreate(wifi_scan_and_connect_task, "wifi_scan_task", 4096, NULL, 5, &wifi_scan_task_handle);
-        ESP_LOGI(TAG, "WiFi scan and connect task started");
     }
 }

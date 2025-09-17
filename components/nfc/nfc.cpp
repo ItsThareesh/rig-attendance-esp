@@ -5,18 +5,48 @@
 #include "esp_log.h"
 #include "esp_err.h"
 #include "driver/i2c.h"
+#include "driver/gpio.h"
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/timers.h"
+#include "freertos/queue.h"
 
-#include "hmac_token_generator.h"
 #include "nfc.h"
 #include "time_sync.h"
 #include "ndef.hpp"
 
 static const char *TAG = "NFC";
+
 static espp::St25dv *global_st25dv = nullptr;
 static HMACTokenGenerator *global_hmac_generator = nullptr;
+static QueueHandle_t gpo_evt_queue = NULL;
+static espp::Ndef record = espp::Ndef::make_uri(
+    "webapp--rig-attendance-app.asia-east1.hosted.app", espp::Ndef::Uic::HTTPS);
+
+static void nfc_gpo_isr(void *arg)
+{
+    uint32_t gpio_num = (uint32_t)arg;
+    xQueueSendFromISR(gpo_evt_queue, &gpio_num, NULL);
+}
+
+esp_err_t nfc_gpio_init()
+{
+    gpio_config_t io_conf = {
+        .pin_bit_mask = 1ULL << NFC_GPO_GPIO,
+        .mode = GPIO_MODE_INPUT,
+        .pull_up_en = GPIO_PULLUP_ENABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type = GPIO_INTR_POSEDGE, // Rising edge = field detected
+    };
+
+    gpio_config(&io_conf);
+
+    gpio_install_isr_service(0); // Default ISR service
+    gpio_isr_handler_add(gpio_num_t(NFC_GPO_GPIO), nfc_gpo_isr, (void *)NFC_GPO_GPIO);
+
+    return ESP_OK;
+}
 
 void configure_i2c_nfc(void)
 {
@@ -50,35 +80,15 @@ void configure_i2c_nfc(void)
     ESP_LOGI(TAG, "I2C configured successfully for NFC");
 }
 
-std::vector<uint8_t> get_serialized_tlv(espp::Ndef &record)
-{
-    std::vector<uint8_t> ndef_message = record.serialize();
-    std::vector<uint8_t> tlv_message;
-    tlv_message.reserve(ndef_message.size() + 3); // 0x03 + len + msg + 0xFE
-
-    tlv_message.push_back(0x03); // NDEF TLV Tag
-    tlv_message.push_back(ndef_message.size());
-
-    // Append the actual NDEF message
-    tlv_message.insert(tlv_message.end(), ndef_message.begin(), ndef_message.end());
-
-    // Terminator TLV
-    tlv_message.push_back(0xFE);
-
-    return tlv_message;
-}
-
-void write_nfc_ftm(TimerHandle_t xTimer)
+void generate_nfc_url(TimerHandle_t xTimer)
 {
     // Ensure system time has been synchronized at least once and
     // NFC and HMAC generator are initialized
-    if (!global_st25dv || !global_hmac_generator)
+    if (!is_time_valid() || !global_st25dv || !global_hmac_generator)
     {
-        ESP_LOGW(TAG, "NFC write skipped - not ready");
+        ESP_LOGW(TAG, "URL Generate skipped - not ready");
         return;
     }
-
-    ESP_LOGI(TAG, "Periodic NFC update (every 5 seconds)");
 
     std::error_code ec;
     static char url_buffer[512];
@@ -92,173 +102,37 @@ void write_nfc_ftm(TimerHandle_t xTimer)
              token.c_str());
 
     // Create NDEF records
-    espp::Ndef record = espp::Ndef::make_uri(url_buffer, espp::Ndef::Uic::HTTPS);
-
-    // Start FTM mode
-    global_st25dv->start_fast_transfer_mode(ec);
-    if (ec)
-    {
-        ESP_LOGE(TAG, "start_fast_transfer_mode() failed: %s", ec.message().c_str());
-        return;
-    }
-
-    // Serialize NDEF records for writing into FTM mailbox
-    std::vector<uint8_t> serialized_records = get_serialized_tlv(record);
-
-    ESP_LOGI(TAG, "Serialized NDEF records size: %d", serialized_records.size());
-
-    // Write NDEF records to FTM mailbox
-    global_st25dv->transfer(serialized_records.data(), serialized_records.size(), ec);
-    if (ec)
-    {
-        ESP_LOGE(TAG, "Failed to write NDEF records: %s", ec.message().c_str());
-        return;
-    }
-
-    // std::vector<uint8_t> data(serialized_records.size());
-    // global_st25dv->receive(data.data(), data.size(), ec);
-
-    // // READ the mailbox
-    // ESP_LOGI(TAG, "FTM Mailbox Length: %d", data.size());
-    // ESP_LOGI(TAG, "FTM Mailbox Data:");
-    // for (size_t i = 0; i < data.size(); i++)
-    // {
-    //     printf("%02X ", data[i]);
-    // }
-    // printf("\n");
-
-    global_st25dv->stop_fast_transfer_mode(ec);
-    if (ec)
-    {
-        ESP_LOGE(TAG, "stop_fast_transfer_mode() failed: %s", ec.message().c_str());
-        return;
-    }
-
-    ESP_LOGI(TAG, "NDEF records written successfully to FTM mailbox");
+    record = espp::Ndef::make_uri(url_buffer, espp::Ndef::Uic::HTTPS);
 }
 
-esp_err_t write_static_eeprom_record()
+void gpo_event_task(void *pvParameters)
 {
-    if (!global_st25dv)
-        return ESP_FAIL;
+    uint32_t gpio_num;
+    ESP_LOGI(TAG, "GPO task started - waiting for phone detection");
+    static TickType_t last_event_tick = 0;
 
-    std::error_code ec;
-
-    // Create static record
-    espp::Ndef record = espp::Ndef::make_text("RIG Attendance System 2025");
-
-    // Write to EEPROM
-    global_st25dv->set_record(record, ec);
-    if (ec)
+    while (1)
     {
-        ESP_LOGE(TAG, "Failed to write static EEPROM record: %s", ec.message().c_str());
-        return ESP_FAIL;
+        if (xQueueReceive(gpo_evt_queue, &gpio_num, portMAX_DELAY) == pdTRUE)
+        {
+            TickType_t now = xTaskGetTickCount();
+
+            // Too soon, ignore duplicate
+            if (now - last_event_tick < pdMS_TO_TICKS(NFC_UPDATE_INTERVAL_MS))
+                continue;
+
+            last_event_tick = now;
+
+            ESP_LOGI(TAG, "Phone detected! Writing to EEPROM now...");
+
+            std::error_code ec;
+            global_st25dv->set_record(record, ec);
+            if (ec)
+                ESP_LOGE(TAG, "GPO: Failed to write EEPROM record: %s", ec.message().c_str());
+            else
+                ESP_LOGI(TAG, "GPO: EEPROM record written successfully");
+        }
     }
-
-    ESP_LOGI(TAG, "Static EEPROM record written successfully");
-    return ESP_OK;
-}
-
-bool present_password(const uint8_t pwd[8])
-{
-    uint8_t buffer[2 + 17] = {0};
-
-    // Register address (I2C_PWD)
-    buffer[0] = 0x09;
-    buffer[1] = 0x00;
-
-    // Copy password
-    memcpy(&buffer[2], pwd, 8);
-
-    // Validation code
-    buffer[10] = 0x09;
-
-    // Second password
-    memcpy(&buffer[11], pwd, 8);
-
-    // Send to ST25DV
-    esp_err_t ret = i2c_master_write_to_device(
-        I2C_NUM_1,
-        espp::St25dv::SYST_ADDRESS,
-        buffer,
-        sizeof(buffer),
-        pdMS_TO_TICKS(200));
-
-    if (ret != ESP_OK)
-        return false;
-
-    return true;
-}
-
-// Add this function to write to system register 0x000D (MB_MODE)
-esp_err_t enable_mb_mode()
-{
-    uint8_t default_password[8] = {0, 0, 0, 0, 0, 0, 0, 0};
-
-    ESP_LOGI(TAG, "Presenting password for MB_MODE...");
-    if (!present_password(default_password))
-    {
-        ESP_LOGE(TAG, "Cannot enable MB_MODE without presenting password");
-        return ESP_FAIL;
-    }
-
-    // Add delay after password presentation
-    vTaskDelay(pdMS_TO_TICKS(500));
-
-    // Write to MB_MODE register (0x000D) using SYST_ADDRESS
-    uint8_t write_data[3] = {
-        0x00,
-        0x0D,
-        0x01,
-    };
-
-    ESP_LOGI(TAG, "Writing to MB_MODE register...");
-    esp_err_t write_result = i2c_master_write_to_device(
-        I2C_NUM_1,
-        espp::St25dv::SYST_ADDRESS,
-        write_data,
-        sizeof(write_data),
-        pdMS_TO_TICKS(500)); // Increased timeout
-
-    if (write_result != ESP_OK)
-    {
-        ESP_LOGE(TAG, "Failed to write MB_MODE register: %s", esp_err_to_name(write_result));
-        return write_result;
-    }
-
-    // Add delay after write
-    vTaskDelay(pdMS_TO_TICKS(100));
-
-    // Read back to verify
-    uint8_t read_address[2] = {0x00, 0x0D};
-    uint8_t read_data[1];
-
-    esp_err_t read_result = i2c_master_write_read_device(
-        I2C_NUM_1,
-        espp::St25dv::SYST_ADDRESS,
-        read_address,
-        sizeof(read_address),
-        read_data,
-        sizeof(read_data),
-        pdMS_TO_TICKS(500));
-
-    if (read_result != ESP_OK)
-    {
-        ESP_LOGE(TAG, "Failed to read back MB_MODE register: %s", esp_err_to_name(read_result));
-        return read_result;
-    }
-
-    ESP_LOGI(TAG, "MB_MODE register value: 0x%02X", read_data[0]);
-
-    if (read_data[0] & 0x01)
-        ESP_LOGI(TAG, "MB_MODE enabled successfully");
-    else
-    {
-        ESP_LOGE(TAG, "MB_MODE not properly enabled (expected bit 0 set)");
-        return ESP_FAIL;
-    }
-
-    return ESP_OK;
 }
 
 // Task to initialize NFC and start timers
@@ -305,33 +179,50 @@ void start_nfc_task(HMACTokenGenerator *hmac_generator)
     // Initialize Global HMAC generator to passed parameter
     global_hmac_generator = hmac_generator;
 
-    if (write_static_eeprom_record() != ESP_OK)
+    // Create queue for GPO events (RF field detection)
+    gpo_evt_queue = xQueueCreate(10, sizeof(uint32_t));
+    if (gpo_evt_queue == NULL)
     {
-        ESP_LOGE(TAG, "Static EEPROM write: Aborting NFC initialization");
+        ESP_LOGE(TAG, "Failed to create GPO event queue");
         return;
     }
 
-    vTaskDelay(pdMS_TO_TICKS(500));
-
-    if (enable_mb_mode() != ESP_OK)
+    // Configure GPO interrupt for RF field detection
+    if (nfc_gpio_init() != ESP_OK)
     {
-        ESP_LOGE(TAG, "Failed to enable MB_Mode, aborting NFC initialization");
+        ESP_LOGE(TAG, "Failed to configure GPO interrupt");
+        return;
+    }
+
+    // Create GPO event task for immediate RF field response
+    TaskHandle_t gpo_task_handle = NULL;
+    BaseType_t task_created = xTaskCreate(
+        gpo_event_task,
+        "gpo_rf_task",
+        4096, // Stack size
+        NULL, // Task parameters
+        5,    // Priority (higher than timer task)
+        &gpo_task_handle);
+
+    if (task_created != pdPASS)
+    {
+        ESP_LOGE(TAG, "Failed to create GPO RF field task");
         return;
     }
 
     // Create timer for periodic updates every 5 seconds
     TimerHandle_t nfc_timer = xTimerCreate(
-        "write_nfc_timer",
+        "generate_nfc_url_timer",
         pdMS_TO_TICKS(NFC_UPDATE_INTERVAL_MS), // 5 seconds
         pdTRUE,                                // Auto-reload
         (void *)0,                             // Timer ID
-        write_nfc_ftm                          // Callback function
+        generate_nfc_url                       // Callback function
     );
 
     if (nfc_timer != NULL)
     {
         xTimerStart(nfc_timer, 0);
-        ESP_LOGI(TAG, "NFC periodic update timer started (5s interval)");
+        ESP_LOGI(TAG, "NFC periodic update timer started (%ds interval)", NFC_UPDATE_INTERVAL_MS / 1000);
     }
     else
         ESP_LOGE(TAG, "Failed to create NFC update timer");

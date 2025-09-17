@@ -6,6 +6,7 @@
 // NFC configuration
 #define NFC_SDA_GPIO 21
 #define NFC_SCL_GPIO 22
+#define NFC_GPO_GPIO 4
 #define NFC_UPDATE_INTERVAL_MS 5000
 
 #ifdef __cplusplus
@@ -22,5 +23,3 @@ extern "C"
 #ifdef __cplusplus
 }
 #endif
-
-std::vector<uint8_t> serialize_ndef_records(std::vector<espp::Ndef> &records);
