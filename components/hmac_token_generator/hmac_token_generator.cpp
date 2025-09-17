@@ -1,7 +1,9 @@
-#include "hmac_token_generator.h"
-#include "mbedtls/md.h"
 #include <stdexcept>
 #include <cstring>
+
+#include "mbedtls/md.h"
+
+#include "hmac_token_generator.h"
 
 // Constructor with secret key and HMAC function
 HMACTokenGenerator::HMACTokenGenerator(const std::string &key) : secret_key(key) {}

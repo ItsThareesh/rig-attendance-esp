@@ -79,7 +79,6 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
     }
 }
 
-// Simplified scan task - only runs when needed
 static void wifi_scan_and_connect_task(void *pvParameters)
 {
     ESP_LOGI(TAG, "WiFi scan task started");
@@ -87,7 +86,8 @@ static void wifi_scan_and_connect_task(void *pvParameters)
 
     while (1)
     {
-        // Only scan if not connected (task gets suspended when connected)
+        // This takes considerably long time, so measure duration for accurate delay
+        uint32_t start_time = esp_log_timestamp();
         ESP_LOGI(TAG, "Scanning for WiFi network: %s", WIFI_SSID_FOR_SYNC);
 
         // Start WiFi scan
@@ -137,8 +137,8 @@ static void wifi_scan_and_connect_task(void *pvParameters)
         else
             ESP_LOGW(TAG, "WiFi scan failed: %s", esp_err_to_name(scan_result));
 
-        // Wait before next scan attempt
-        vTaskDelay(pdMS_TO_TICKS(WIFI_CONNECT_RETRY_DELAY_MS));
+        uint32_t scan_duration = esp_log_timestamp() - start_time;
+        vTaskDelay(pdMS_TO_TICKS(WIFI_CONNECT_RETRY_DELAY_MS - scan_duration));
     }
 }
 

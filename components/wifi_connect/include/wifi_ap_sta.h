@@ -11,7 +11,7 @@
 #define WIFI_AP_MAX_CONNECTIONS 4
 
 // WiFi scan configuration
-#define WIFI_CONNECT_RETRY_DELAY_MS 5000 // Retry connection every 5 second
+#define WIFI_CONNECT_RETRY_DELAY_MS 10000 // Retry connection every 10 seconds
 
 #ifdef __cplusplus
 extern "C"
