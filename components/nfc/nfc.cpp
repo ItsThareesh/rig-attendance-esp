@@ -21,8 +21,9 @@ static const char *TAG = "NFC";
 static espp::St25dv *global_st25dv = nullptr;
 static HMACTokenGenerator *global_hmac_generator = nullptr;
 static QueueHandle_t gpo_evt_queue = NULL;
-static espp::Ndef record = espp::Ndef::make_uri(
-    "webapp--rig-attendance-app.asia-east1.hosted.app", espp::Ndef::Uic::HTTPS);
+static std::vector<uint8_t> record = espp::Ndef::make_uri(
+                                         "webapp--rig-attendance-app.asia-east1.hosted.app", espp::Ndef::Uic::HTTPS)
+                                         .serialize();
 
 static void nfc_gpo_isr(void *arg)
 {
@@ -102,7 +103,7 @@ void generate_nfc_url(TimerHandle_t xTimer)
              token.c_str());
 
     // Create NDEF records
-    record = espp::Ndef::make_uri(url_buffer, espp::Ndef::Uic::HTTPS);
+    record = espp::Ndef::make_uri(url_buffer, espp::Ndef::Uic::HTTPS).serialize();
 }
 
 void gpo_event_task(void *pvParameters)
