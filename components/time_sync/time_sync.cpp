@@ -22,7 +22,7 @@ static const char *TAG = "TimeSync";
 #define TIME_SYNC_DONE_BIT BIT0
 
 static EventGroupHandle_t time_sync_event_group;
-static TaskHandle_t time_sync_task_handle = NULL;
+static TaskHandle_t periodic_time_sync_task_handle = NULL;
 static TickType_t last_sync_attempt = 0;
 
 static void time_sync_notification_cb(struct timeval *tv)
@@ -31,9 +31,29 @@ static void time_sync_notification_cb(struct timeval *tv)
     xEventGroupSetBits(time_sync_event_group, TIME_SYNC_DONE_BIT);
 }
 
+void get_current_time_string(char *buffer, size_t buffer_size)
+{
+    time_t now;
+    struct tm timeinfo;
+
+    time(&now);
+    localtime_r(&now, &timeinfo);
+
+    strftime(buffer, buffer_size, "%Y-%m-%d %H:%M:%S", &timeinfo);
+}
+
+bool is_time_valid(void)
+{
+    time_t now;
+    time(&now);
+
+    // Timestamp for Wednesday, January 1, 2025 12:00:00 AM UTC
+    return now > 1735689600;
+}
+
 esp_err_t sync_time_from_sntp(void)
 {
-    if (!is_wifi_sta_connected())
+    if (!is_sta_connected())
     {
         ESP_LOGW(TAG, "WiFi STA not connected, cannot sync time");
         return ESP_FAIL;
@@ -79,20 +99,28 @@ esp_err_t sync_time_from_sntp(void)
     }
 }
 
-static void time_sync_task(void *pvParameters)
+static void periodic_time_sync_task(void *pvParameters)
 {
-    ESP_LOGI(TAG, "Time sync task started - will sync every %d minutes", TIME_SYNC_INTERVAL_MINUTES);
+    ESP_LOGI(TAG, "Time sync task started - Will sync every %d minutes", TIME_SYNC_INTERVAL_MINUTES);
 
     while (1)
     {
-        ESP_LOGI(TAG, "Starting periodic time synchronization...");
+        ESP_LOGI(TAG, "Starting periodic time synchronization");
 
         // Check current time status
-        if (!is_time_valid())
-            ESP_LOGI(TAG, "System time is not valid, attempting first sync...");
+        if (is_time_valid())
+        {
+            char current_time[64];
+            get_current_time_string(current_time, sizeof(current_time));
+            ESP_LOGI(TAG, "Current time before sync: %s", current_time);
+        }
+        else
+        {
+            ESP_LOGI(TAG, "System time is invalid, Attempting first sync");
+        }
 
         // Check if WiFi STA is connected
-        if (is_wifi_sta_connected())
+        if (is_sta_connected())
         {
             // Perform time sync
             if (sync_time_from_sntp() == ESP_OK)
@@ -124,28 +152,8 @@ void time_sync_init(void)
 
     ESP_LOGI(TAG, "Time sync initialization complete");
 
-    if (time_sync_task_handle == NULL)
-        xTaskCreate(time_sync_task, "time_sync_task", 4096, NULL, 5, &time_sync_task_handle);
-}
-
-void get_current_time_string(char *buffer, size_t buffer_size)
-{
-    time_t now;
-    struct tm timeinfo;
-
-    time(&now);
-    localtime_r(&now, &timeinfo);
-
-    strftime(buffer, buffer_size, "%Y-%m-%d %H:%M:%S", &timeinfo);
-}
-
-bool is_time_valid(void)
-{
-    time_t now;
-    time(&now);
-
-    // Timestamp for Wednesday, January 1, 2025 12:00:00 AM UTC
-    return now > 1735689600;
+    if (periodic_time_sync_task_handle == NULL)
+        xTaskCreate(periodic_time_sync_task, "periodic_time_sync_task", 4096, NULL, 5, &periodic_time_sync_task_handle);
 }
 
 esp_err_t trigger_manual_time_sync(void)
@@ -155,7 +163,7 @@ esp_err_t trigger_manual_time_sync(void)
     esp_err_t ret = ESP_FAIL;
 
     // Check if WiFi STA is connected
-    if (is_wifi_sta_connected())
+    if (is_sta_connected())
     {
         // Perform time sync
         ret = sync_time_from_sntp();
@@ -172,4 +180,29 @@ esp_err_t trigger_manual_time_sync(void)
         ESP_LOGW(TAG, "WiFi STA not connected, cannot perform manual time sync");
 
     return ret;
+}
+
+static void async_time_sync_task(void *pvParameters)
+{
+    if (trigger_manual_time_sync() == ESP_OK)
+        ESP_LOGI(TAG, "Async time sync completed successfully");
+    else
+        ESP_LOGW(TAG, "Async time sync failed");
+
+    // Delete this task
+    vTaskDelete(NULL);
+}
+
+esp_err_t trigger_async_time_sync(void)
+{
+    // Create a task to perform time sync asynchronously
+    BaseType_t result = xTaskCreate(async_time_sync_task, "async_time_sync", 4096, NULL, 5, NULL);
+
+    if (result == pdPASS)
+        return ESP_OK;
+    else
+    {
+        ESP_LOGE(TAG, "Failed to create async time sync task");
+        return ESP_FAIL;
+    }
 }

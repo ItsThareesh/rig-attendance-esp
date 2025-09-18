@@ -7,6 +7,7 @@
 #define NFC_SDA_GPIO 21
 #define NFC_SCL_GPIO 22
 #define NFC_GPO_GPIO 4
+
 #define NFC_UPDATE_INTERVAL_MS 5000
 
 #ifdef __cplusplus

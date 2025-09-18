@@ -17,6 +17,7 @@
 #include "ndef.hpp"
 
 static const char *TAG = "NFC";
+static const char *TAG2 = "NFC-GPO";
 
 static espp::St25dv *global_st25dv = nullptr;
 static HMACTokenGenerator *global_hmac_generator = nullptr;
@@ -109,7 +110,7 @@ void generate_nfc_url(TimerHandle_t xTimer)
 void gpo_event_task(void *pvParameters)
 {
     uint32_t gpio_num;
-    ESP_LOGI(TAG, "GPO task started - waiting for phone detection");
+    ESP_LOGI(TAG2, "Task started - waiting for phone detection");
     static TickType_t last_event_tick = 0;
 
     while (1)
@@ -124,14 +125,14 @@ void gpo_event_task(void *pvParameters)
 
             last_event_tick = now;
 
-            ESP_LOGI(TAG, "Phone detected! Writing to EEPROM now...");
+            ESP_LOGI(TAG2, "Phone detected! Writing to EEPROM now...");
 
             std::error_code ec;
             global_st25dv->set_record(record, ec);
             if (ec)
-                ESP_LOGE(TAG, "GPO: Failed to write EEPROM record: %s", ec.message().c_str());
+                ESP_LOGE(TAG2, "Failed to write EEPROM record: %s", ec.message().c_str());
             else
-                ESP_LOGI(TAG, "GPO: EEPROM record written successfully");
+                ESP_LOGI(TAG2, "EEPROM record written successfully");
         }
     }
 }
@@ -189,25 +190,23 @@ void start_nfc_task(HMACTokenGenerator *hmac_generator)
     }
 
     // Configure GPO interrupt for RF field detection
-    if (nfc_gpio_init() != ESP_OK)
+    if (nfc_gpio_init() == ESP_OK)
+        ESP_LOGI(TAG2, "GPO interrupt configured on GPIO %d", NFC_GPO_GPIO);
+    else
     {
-        ESP_LOGE(TAG, "Failed to configure GPO interrupt");
+        ESP_LOGE(TAG2, "Failed to configure GPO interrupt");
         return;
     }
 
     // Create GPO event task for immediate RF field response
     TaskHandle_t gpo_task_handle = NULL;
-    BaseType_t task_created = xTaskCreate(
-        gpo_event_task,
-        "gpo_rf_task",
-        4096, // Stack size
-        NULL, // Task parameters
-        5,    // Priority (higher than timer task)
-        &gpo_task_handle);
+    BaseType_t task_created = xTaskCreate(gpo_event_task, "gpo_event_task", 4096, NULL, 5, &gpo_task_handle);
 
-    if (task_created != pdPASS)
+    if (task_created == pdPASS)
+        ESP_LOGI(TAG2, "GPO Event Task Created");
+    else
     {
-        ESP_LOGE(TAG, "Failed to create GPO RF field task");
+        ESP_LOGE(TAG2, "Failed to create GPO Event Task");
         return;
     }
 
@@ -223,7 +222,7 @@ void start_nfc_task(HMACTokenGenerator *hmac_generator)
     if (nfc_timer != NULL)
     {
         xTimerStart(nfc_timer, 0);
-        ESP_LOGI(TAG, "NFC periodic update timer started (%ds interval)", NFC_UPDATE_INTERVAL_MS / 1000);
+        ESP_LOGI(TAG, "Periodic Update Timer Started (%ds Interval)", NFC_UPDATE_INTERVAL_MS / 1000);
     }
     else
         ESP_LOGE(TAG, "Failed to create NFC update timer");
