@@ -12,6 +12,8 @@
   },
   "idf.flashType": "UART",
   "files.associations": {
-    "st25dv_ndef.h": "c"
+    "st25dv_ndef.h": "c",
+    "system_error": "cpp",
+    "atomic": "cpp"
   }
 }

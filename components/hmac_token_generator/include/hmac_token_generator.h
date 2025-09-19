@@ -6,17 +6,7 @@
 #include <sstream>
 #include <iomanip>
 #include <functional>
-#include "mbedtls/md.h"
 
-/**
- * HMACTokenGenerator - A secure timestamp-based token generation system
- *
- * Features:
- * - Current timestamp-based tokens with configurable tolerance
- * - Includes access method information in tokens
- * - HMAC-SHA256 based security
- * - Non-human readable tokens for security
- */
 class HMACTokenGenerator
 {
 private:

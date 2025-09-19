@@ -11,8 +11,8 @@
 #define WIFI_AP_MAX_CONNECTIONS 4
 
 // WiFi scan configuration
-#define WIFI_SCAN_INTERVAL_MS 30000      // Scan every 30 seconds
-#define WIFI_CONNECT_RETRY_DELAY_MS 5000 // Retry connection every 5 seconds
+#define WIFI_SCAN_INTERVAL_MS 60000       // Scan every 60 seconds
+#define WIFI_CONNECT_RETRY_DELAY_MS 15000 // Retry connection every 15 seconds
 
 #ifdef __cplusplus
 extern "C"
@@ -24,7 +24,7 @@ extern "C"
     void wifi_init_softap(void);
 
     // Check if STA is connected to external WiFi network
-    bool is_wifi_sta_connected(void);
+    bool is_sta_connected(void);
 
 #ifdef __cplusplus
 }

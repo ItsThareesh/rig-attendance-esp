@@ -26,35 +26,10 @@ extern "C"
     void time_sync_init(void);
 
     /**
-     * @brief Perform SNTP time synchronization
-     * @return ESP_OK on success, ESP_FAIL on failure
-     */
-    esp_err_t sync_time_from_sntp(void);
-
-    /**
-     * @brief Check if system time is synchronized
-     * @return true if time is synchronized, false otherwise
-     */
-    bool is_time_synchronized(void);
-
-    /**
-     * @brief Get current time as string
-     * @param buffer Buffer to store time string
-     * @param buffer_size Size of the buffer
-     */
-    void get_current_time_string(char *buffer, size_t buffer_size);
-
-    /**
      * @brief Check if time is valid (after 2025, not default 1970 time)
      * @return true if time appears valid, false otherwise
      */
     bool is_time_valid(void);
-
-    /**
-     * @brief Trigger manual time synchronization
-     * @return ESP_OK on success, ESP_FAIL on failure
-     */
-    esp_err_t trigger_manual_time_sync(void);
 
     /**
      * @brief Trigger asynchronous time synchronization (non-blocking)

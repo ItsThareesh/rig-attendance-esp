@@ -1,6 +1,9 @@
-#include "hmac_token_generator.h"
 #include <stdexcept>
 #include <cstring>
+
+#include "mbedtls/md.h"
+
+#include "hmac_token_generator.h"
 
 // Constructor with secret key and HMAC function
 HMACTokenGenerator::HMACTokenGenerator(const std::string &key) : secret_key(key) {}
@@ -9,10 +12,6 @@ HMACTokenGenerator::HMACTokenGenerator(const std::string &key) : secret_key(key)
 std::string HMACTokenGenerator::mbedTLS_HMAC_SHA256(const std::string &secret_key, const std::string &data)
 {
     const mbedtls_md_info_t *md_info = mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
-    if (md_info == nullptr)
-    {
-        throw std::runtime_error("SHA256 not available in mbedTLS");
-    }
 
     unsigned char hash[32]; // SHA256 produces 32 bytes
     int ret = mbedtls_md_hmac(md_info,
@@ -21,11 +20,6 @@ std::string HMACTokenGenerator::mbedTLS_HMAC_SHA256(const std::string &secret_ke
                               reinterpret_cast<const unsigned char *>(data.c_str()),
                               data.length(),
                               hash);
-
-    if (ret != 0)
-    {
-        throw std::runtime_error("mbedTLS HMAC computation failed");
-    }
 
     std::stringstream ss;
     ss << std::hex << std::setfill('0');

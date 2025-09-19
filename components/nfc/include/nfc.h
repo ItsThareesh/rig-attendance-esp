@@ -1,12 +1,14 @@
 #pragma once
 
 #include "hmac_token_generator.h"
+#include "st25dv.hpp"
 
 // NFC configuration
 #define NFC_SDA_GPIO 21
 #define NFC_SCL_GPIO 22
-#define NFC_UPDATE_INTERVAL_MS 30000
-#define NFC_TAP_CHECK_INTERVAL_MS 2000
+#define NFC_GPO_GPIO 4
+
+#define NFC_UPDATE_INTERVAL_MS 5000
 
 #ifdef __cplusplus
 extern "C"
